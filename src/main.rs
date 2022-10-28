@@ -17,6 +17,8 @@
 extern crate reqwest;
 extern crate serde;
 
+use log::{debug, info};
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
@@ -24,24 +26,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let url = match std::env::args().nth(1) {
         Some(url) => url,
         None => {
-            println!("No CLI URL provided, using default.");
+            info!("No CLI URL provided, using default.");
             "https://hyper.rs".into()
         }
     };
 
-    eprintln!("Fetching {:?}...", url);
+    debug!("Fetching {:?}...", url);
 
     // reqwest::blocking::get() is a convenience function.
     //
     // In most cases, you should create/build a reqwest::Client and reuse
     // it for all requests.
-    let mut res = reqwest::blocking::get(url)?;
+    let res = reqwest::blocking::get(url)?;
 
-    eprintln!("Response: {:?} {}", res.version(), res.status());
-    eprintln!("Headers: {:#?}\n", res.headers());
+    info!("Response: {:?} {}", res.version(), res.status());
+    // debug!("Headers: {:#?}\n", res.headers());
 
     // copy the response body directly to stdout
-    res.copy_to(&mut std::io::stdout())?;
+    //res.copy_to(&mut std::io::stdout())?;
+    info!("Result: {}", res.content_length().unwrap_or_default());
 
     Ok(())
 }
