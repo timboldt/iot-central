@@ -17,10 +17,34 @@
 extern crate reqwest;
 extern crate serde;
 
+mod adafruit;
+
+use adafruit::Metric;
 use log::{debug, info};
+use std::sync::mpsc::channel;
+use std::thread;
+
+struct DummyClient {
+
+}
+
+impl adafruit::MetricClient for DummyClient {
+    fn publish(&self, metric: Metric) {
+        info!("DummyClient published: {}/{}", metric.feed, metric.value);
+    }
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
+
+    let (tx, rx) = channel();
+    let dc = DummyClient{};
+    let h = thread::spawn(move || adafruit::aio_sender(&dc, rx));
+    tx.send(Metric{feed: "test".into(), value: 42.0}).unwrap();
+    tx.send(Metric{feed: "other".into(), value: 3.14}).unwrap();
+    tx.send(Metric{feed: "another".into(), value: 18.0}).unwrap();
+    drop(tx);
+    h.join().unwrap();
 
     // Some simple CLI args requirements...
     let url = match std::env::args().nth(1) {
