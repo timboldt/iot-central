@@ -17,8 +17,8 @@
 use log::{debug, info};
 use std::sync::mpsc;
 
+#[derive(Debug)]
 pub struct CallParams {
-    pub client: reqwest::blocking::Client,
     pub base_url: String,
     pub io_user: String,
     pub io_key: String,
@@ -31,7 +31,9 @@ pub struct Metric {
 }
 
 pub fn aio_sender(params: CallParams, rx: mpsc::Receiver<Metric>) {
-    let client = params.client;
+    info!("aio_sender starting");
+    debug!("aio_sender parameters {:?}", params);
+    let client = reqwest::blocking::Client::new();
     while let Ok(m) = rx.recv() {
         debug!("Received {:?}", m);
         let url = format!(

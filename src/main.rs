@@ -14,57 +14,65 @@
 
 #![warn(clippy::all)]
 
+extern crate ctrlc;
 extern crate reqwest;
 extern crate serde;
 
 mod adafruit;
+mod weather;
 
-use adafruit::Metric;
 use log::{debug, info};
 use std::env;
 use std::sync::mpsc::channel;
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
+    let shutdown = Arc::new((Mutex::new(false), Condvar::new()));
     let (tx, rx) = channel();
-    let params = adafruit::CallParams{
-        client: reqwest::blocking::Client::new(),
+
+    // Start the Adafruit IO transmission agent.
+    let aio_params = adafruit::CallParams {
         base_url: "https://io.adafruit.com/api/v2".to_owned(),
         io_user: env::var("IO_USERNAME").expect("Adafruit IO_USERNAME is not defined."),
         io_key: env::var("IO_KEY").expect("Adafruti IO_KEY is not defined."),
     };
-    let h = thread::spawn(move || adafruit::aio_sender(params, rx));
-    tx.send(Metric{feed: "test1".into(), value: 42.0}).unwrap();
-    tx.send(Metric{feed: "test1".into(), value: 3.22}).unwrap();
-    tx.send(Metric{feed: "test1".into(), value: 18.0}).unwrap();
-    drop(tx);
-    h.join().unwrap();
+    let aio_thread = thread::spawn(move || adafruit::aio_sender(aio_params, rx));
 
-    // Some simple CLI args requirements...
-    let url = match std::env::args().nth(1) {
-        Some(url) => url,
-        None => {
-            info!("No CLI URL provided, using default.");
-            "https://hyper.rs".into()
-        }
+    let weather_params = weather::CallParams {
+        shutdown: shutdown.clone(),
+        tx: tx.clone(),
+        base_url: "https://api.openweathermap.org/data/2.5/onecall".to_owned(),
+        api_key: "XXXX".to_owned(),
+        lat: "XXXX".to_owned(),
+        lon: "XXXX".to_owned(),
+        units: "XXXX".to_owned(),
     };
+    let weather_thread =
+        thread::spawn(move || weather::weather_updater(weather_params));
 
-    debug!("Fetching {:?}...", url);
+    ctrlc::set_handler(move || {
+        info!("Shutdown initiated...");
 
-    // reqwest::blocking::get() is a convenience function.
-    //
-    // In most cases, you should create/build a reqwest::Client and reuse
-    // it for all requests.
-    let res = reqwest::blocking::get(url)?;
+        // Signal all the producer threads.
+        let (lock, cvar) = &*shutdown;
+        let mut sig = lock.lock().unwrap();
+        *sig = true;
+        cvar.notify_all();
+    })
+    .unwrap();
 
-    info!("Response: {:?} {}", res.version(), res.status());
-    // debug!("Headers: {:#?}\n", res.headers());
+    info!("Waiting for Weather thread...");
+    weather_thread
+        .join()
+        .expect("Failed to join weather_thread.");
 
-    // copy the response body directly to stdout
-    //res.copy_to(&mut std::io::stdout())?;
-    info!("Result: {}", res.content_length().unwrap_or_default());
+    // Signal the consumer thread (Adafruit IO sender).
+    drop(tx);
+    info!("Waiting for Adafruit IO thread...");
+    aio_thread.join().expect("Failed to join aio_thread.");
 
     Ok(())
 }
