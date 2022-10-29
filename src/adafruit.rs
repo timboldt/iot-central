@@ -17,8 +17,11 @@
 use log::{debug, info};
 use std::sync::mpsc;
 
-pub trait MetricClient {
-    fn publish(&self, metric: Metric);
+pub struct CallParams {
+    pub client: reqwest::blocking::Client,
+    pub base_url: String,
+    pub io_user: String,
+    pub io_key: String,
 }
 
 #[derive(Debug)]
@@ -27,10 +30,25 @@ pub struct Metric {
     pub value: f32,
 }
 
-pub fn aio_sender(client: &dyn MetricClient, rx: mpsc::Receiver<Metric>) {
+pub fn aio_sender(params: CallParams, rx: mpsc::Receiver<Metric>) {
+    let client = params.client;
     while let Ok(m) = rx.recv() {
         debug!("Received {:?}", m);
-        client.publish(m);
+        let url = format!(
+            "{}/{}/feeds/{}/data",
+            params.base_url, params.io_user, m.feed
+        );
+        debug!("POSTing to {}", url);
+        let form = reqwest::blocking::multipart::Form::new().text("value", m.value.to_string());
+        let resp = client
+            .post(url)
+            .header("X-AIO-Key", params.io_key.as_bytes())
+            .multipart(form)
+            .send();
+        match resp {
+            Ok(r) => { debug!("POST succeeded: {:?}", r.status()); },
+            _ => { debug!("POST failed: {:?}", resp.err()); },
+        }
     }
     info!("aio_sender finished");
 }
