@@ -42,28 +42,24 @@ struct OneCallWeather {
 struct CurrentConditions {
     #[serde(rename = "dt")]
     utc_timestamp: i64,
-    sunrise: i64,
-    sunset: i64,
-    // Temperature in degrees (C, F or K).
+    // sunrise: i64,
+    // sunset: i64,
     #[serde(rename = "temp")]
     temperature: f32,
-    // Percent humidity.
     humidity: i32,
-    // Pressure in hPa.
     pressure: i32,
-    // Wind speed (kmph or mph).
-    wind_speed: f32,
-    wind_deg: i16,
-    weather: Vec<WeatherInfo>,
+    // wind_speed: f32,
+    // wind_deg: i16,
+    // weather: Vec<WeatherInfo>,
 }
 
-#[derive(Deserialize, Debug, Default)]
-struct WeatherInfo {
-    id: i16,
-    main: String,
-    description: String,
-    icon: String,
-}
+// #[derive(Deserialize, Debug, Default)]
+// struct WeatherInfo {
+//     id: i16,
+//     main: String,
+//     description: String,
+//     icon: String,
+// }
 
 pub fn weather_updater(params: CallParams) {
     info!("weather_updater starting");

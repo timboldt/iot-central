@@ -22,8 +22,7 @@ mod adafruit;
 mod finance;
 mod weather;
 
-use finnhub_rs::client;
-use log::{debug, info};
+use log::info;
 use std::env;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Condvar, Mutex};
