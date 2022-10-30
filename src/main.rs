@@ -19,8 +19,10 @@ extern crate reqwest;
 extern crate serde;
 
 mod adafruit;
+mod finance;
 mod weather;
 
+use finnhub_rs::client;
 use log::{debug, info};
 use std::env;
 use std::sync::mpsc::channel;
@@ -40,6 +42,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         io_key: env::var("IO_KEY").expect("Adafruti IO_KEY is not defined."),
     };
     let aio_thread = thread::spawn(move || adafruit::aio_sender(aio_params, rx));
+
+    // Start the finance thread.
+    let finance_params = finance::CallParams {
+        shutdown: shutdown.clone(),
+        tx: tx.clone(),
+        base_url: "https://finnhub.io/api/v1/quote".to_owned(),
+        api_key: env::var("FINHUB_API_KEY").expect("FINHUB_API_KEY is not defined."),
+        symbols: vec!["DIA".into(), "COINBASE:BTC-USD".into(), "QQQ".into()],
+    };
+    let finance_thread =
+        thread::spawn(move || finance::finance_updater(finance_params));
 
     // Start the weather thread.
     let weather_params = weather::CallParams {
@@ -64,6 +77,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         cvar.notify_all();
     })
     .unwrap();
+
+    info!("Waiting for Finance thread...");
+    finance_thread
+        .join()
+        .expect("Failed to join finance_thread.");
 
     info!("Waiting for Weather thread...");
     weather_thread
