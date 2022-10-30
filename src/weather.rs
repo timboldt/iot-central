@@ -19,7 +19,7 @@ use crate::adafruit;
 //use chrono::{offset::TimeZone, Local, Utc};
 use log::{debug, info};
 use serde::Deserialize;
-use std::sync::{Arc, Condvar, Mutex, mpsc};
+use std::sync::{mpsc, Arc, Condvar, Mutex};
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -33,12 +33,12 @@ pub struct CallParams {
     pub units: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 struct OneCallWeather {
     current: CurrentConditions,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 struct CurrentConditions {
     #[serde(rename = "dt")]
     utc_timestamp: i64,
@@ -57,7 +57,7 @@ struct CurrentConditions {
     weather: Vec<WeatherInfo>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Default)]
 struct WeatherInfo {
     id: i16,
     main: String,
@@ -65,84 +65,55 @@ struct WeatherInfo {
     icon: String,
 }
 
-/*
-let mut timeout_remaining = timeout;
-loop {
-    park_timeout(timeout_remaining);
-    let elapsed = beginning_park.elapsed();
-    if elapsed >= timeout {
-        break;
-    }
-    println!("restarting park_timeout after {elapsed:?}");
-    timeout_remaining = timeout - elapsed;
-*/
-
 pub fn weather_updater(params: CallParams) {
     info!("weather_updater starting");
     debug!("weather_updater parameters {:?}", params);
     let client = reqwest::blocking::Client::new();
-    let update_period = Duration::from_secs(60*60);
+    let update_period = Duration::from_secs(10 * 60);
     loop {
-        // TODO: Fetch the weather and send it to adafruit.io.
+        let url = format!(
+            "{}?lat={}&lon={}&units={}&exclude=minutely,daily&appid={}",
+            params.base_url, params.lat, params.lon, params.units, params.api_key
+        );
+        debug!("Getting weather from {}", url);
+        let resp = client.get(url).send();
+        match resp {
+            Ok(r) => {
+                debug!("GET weather: {:?}", r.status());
+                let w: OneCallWeather = r.json().unwrap_or_default();
+                if w.current.utc_timestamp != 0 {
+                    params.tx.send(adafruit::Metric {
+                        feed: "weather.temp".into(),
+                        value: w.current.temperature,
+                    })
+                    .unwrap();
+                    params.tx.send(adafruit::Metric {
+                        feed: "weather.humidity".into(),
+                        value: w.current.humidity as f32,
+                    })
+                    .unwrap();
+                    params.tx.send(adafruit::Metric {
+                        feed: "weather.pressure".into(),
+                        value: w.current.pressure as f32,
+                    })
+                    .unwrap();
+                }
+            }
+            _ => {
+                debug!("GET weather failed: {:?}", resp.err());
+            }
+        }
 
+        // Wait for next update period, or  shutdown signal.
         let (lock, cvar) = &*params.shutdown;
         let shutdown = cvar
-            .wait_timeout_while(lock.lock().unwrap(), update_period, |&mut shutdown| !shutdown)
+            .wait_timeout_while(lock.lock().unwrap(), update_period, |&mut shutdown| {
+                !shutdown
+            })
             .unwrap();
         if *shutdown.0 {
             break;
         }
     }
     info!("weather_updater finished");
-
-    /*
-           let url = format!(
-               "{}/{}/feeds/{}/data",
-               params.base_url, params.io_user, m.feed
-           );
-
-
-           let url = format!(
-               "https://api.openweathermap.org/data/2.5/onecall?lat={}&lon={}&units={}&exclude=minutely,daily&appid={}",
-               lat, lon, units, api_key
-           );
-           println!("{}", url);
-           let resp: OneCallWeather = reqwest::blocking::get(url)?.json()?;
-           println!("{:?}", resp);
-           let dt = Utc
-               .timestamp(resp.current.utc_timestamp, 0)
-               .with_timezone(&Local);
-           println!("{}", dt);
-
-           let url = format!(
-               "https://api.openweathermap.org/data/2.5/onecall/timemachine?dt={}&lat={}&lon={}&units={}&exclude=minutely,daily&appid={}",
-               resp.current.utc_timestamp - 60 * 60 * 8, lat, lon, units, api_key
-           );
-           println!("{}", url);
-           let resp: OneCallWeather = reqwest::blocking::get(url)?.json()?;
-           println!("{:?}", resp);
-           // let resp = reqwest::blocking::get(url)?.text()?;
-           // println!("{}", resp);
-
-           // TODO:
-           // 1) Convert this information to something useful to the caller, instead of printing it.
-           // 2) Correctly gather useful historical data or cache it.
-           // 3) Possibly daemonize this instead of making it a one-shot.
-
-           // TODO:    tx.send(Metric{feed: "weather.temp".into(), value: resp.x.x}).unwrap();
-
-
-           debug!("POSTing to {}", url);
-           let form = reqwest::blocking::multipart::Form::new().text("value", m.value.to_string());
-           let resp = client
-               .post(url)
-               .header("X-AIO-Key", params.io_key.as_bytes())
-               .multipart(form)
-               .send();
-           match resp {
-               Ok(r) => { debug!("POST succeeded: {:?}", r.status()); },
-               _ => { debug!("POST failed: {:?}", resp.err()); },
-           }
-       }
-    */
 }

@@ -41,14 +41,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let aio_thread = thread::spawn(move || adafruit::aio_sender(aio_params, rx));
 
+    // Start the weather thread.
     let weather_params = weather::CallParams {
         shutdown: shutdown.clone(),
         tx: tx.clone(),
         base_url: "https://api.openweathermap.org/data/2.5/onecall".to_owned(),
-        api_key: "XXXX".to_owned(),
-        lat: "XXXX".to_owned(),
-        lon: "XXXX".to_owned(),
-        units: "XXXX".to_owned(),
+        api_key: env::var("OPEN_WEATHER_KEY").expect("OPEN_WEATHER_KEY is not defined."),
+        lat: env::var("OPEN_WEATHER_LAT").expect("OPEN_WEATHER_LAT is not defined."),
+        lon: env::var("OPEN_WEATHER_LON").expect("OPEN_WEATHER_LON is not defined."),
+        units: "metric".to_owned(),
     };
     let weather_thread =
         thread::spawn(move || weather::weather_updater(weather_params));
