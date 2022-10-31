@@ -5,11 +5,10 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
-readonly TARGET_HOST=pidev
-readonly TARGET_PATH=/home/pi/iot-central
-readonly TARGET_ARCH=aarch64-unknown-linux-gnu
-readonly SOURCE_PATH=./target/${TARGET_ARCH}/release/iot-central
+readonly TARGET_HOST=pizw2
+readonly TARGET_PATH=/home/pi/bin/iot-central
+readonly SOURCE_PATH=./target/release/iot-central
 
-cargo build --release --target=${TARGET_ARCH}
+docker run --user "$(id -u)":"$(id -g)" -v "$PWD":/usr/src/myapp -w /usr/src/myapp rust:bullseye cargo build --release
 rsync ${SOURCE_PATH} ${TARGET_HOST}:${TARGET_PATH}
-ssh -t ${TARGET_HOST} ${TARGET_PATH}
+ssh -t ${TARGET_HOST} sudo systemctl restart iot-central.service
