@@ -14,6 +14,12 @@
 
 #![warn(clippy::all)]
 
+#[cfg(all(feature = "ftdi", feature = "rpi"))]
+compile_error!("feature \"ftdi\" and feature \"rpi\" cannot be enabled at the same time");
+
+#[cfg(feature = "ftdi")]
+extern crate ftdi;
+
 extern crate ctrlc;
 extern crate reqwest;
 extern crate serde;
@@ -22,7 +28,11 @@ mod adafruit;
 mod finance;
 mod weather;
 
+#[cfg(feature = "ftdi")]
+use ftdi_embedded_hal as hal;
+
 use log::info;
+use sgp30::Sgp30;
 use std::env;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Condvar, Mutex};
@@ -30,6 +40,38 @@ use std::thread;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
+
+    #[cfg(feature = "ftdi")]
+    let device = ftdi::find_by_vid_pid(0x0403, 0x6014)
+        .interface(ftdi::Interface::A)
+        .open()
+        .unwrap();
+
+    let hal = hal::FtHal::init_default(device).unwrap();
+    let i2c = hal.i2c().unwrap();
+    let address = 0x58;
+    let mut sgp = Sgp30::new(i2c, address, hal::Delay::default());
+    println!("Starting SGP30 tests.");
+    println!();
+    println!("Serial: {:?}", sgp.serial().unwrap());
+    println!("Feature set: {:?}", sgp.get_feature_set().unwrap());
+    println!(
+        "Self-Test: {}",
+        if sgp.selftest().unwrap() {
+            "Pass"
+        } else {
+            "Fail"
+        }
+    );
+    println!();
+    println!("Initializing...");
+    sgp.init().unwrap();
+    let measurements = sgp.measure().unwrap();
+    let signals = sgp.measure_raw_signals().unwrap();
+    println!(
+        "SGP: CO₂eq = {} ppm, TVOC = {} ppb, H2 sig = {}, Ethanol sig = {}",
+        measurements.co2eq_ppm, measurements.tvoc_ppb, signals.h2, signals.ethanol
+    );
 
     let shutdown = Arc::new((Mutex::new(false), Condvar::new()));
     let (tx, rx) = channel();
@@ -50,8 +92,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         api_key: env::var("FINHUB_API_KEY").expect("FINHUB_API_KEY is not defined."),
         symbols: vec!["DIA".into(), "COINBASE:BTC-USD".into(), "QQQ".into()],
     };
-    let finance_thread =
-        thread::spawn(move || finance::finance_updater(finance_params));
+    let finance_thread = thread::spawn(move || finance::finance_updater(finance_params));
 
     // Start the weather thread.
     let weather_params = weather::CallParams {
@@ -63,8 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         lon: env::var("OPEN_WEATHER_LON").expect("OPEN_WEATHER_LON is not defined."),
         units: "metric".to_owned(),
     };
-    let weather_thread =
-        thread::spawn(move || weather::weather_updater(weather_params));
+    let weather_thread = thread::spawn(move || weather::weather_updater(weather_params));
 
     ctrlc::set_handler(move || {
         info!("Shutdown initiated...");
