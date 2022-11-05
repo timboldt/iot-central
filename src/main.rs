@@ -14,25 +14,16 @@
 
 #![warn(clippy::all)]
 
-#[cfg(all(feature = "ftdi", feature = "rpi"))]
-compile_error!("feature \"ftdi\" and feature \"rpi\" cannot be enabled at the same time");
-
-#[cfg(feature = "ftdi")]
-extern crate ftdi;
-
 extern crate ctrlc;
 extern crate reqwest;
 extern crate serde;
 
 mod adafruit;
 mod finance;
+mod sensor;
 mod weather;
 
-#[cfg(feature = "ftdi")]
-use ftdi_embedded_hal as hal;
-
 use log::info;
-use sgp30::Sgp30;
 use std::env;
 use std::sync::mpsc::channel;
 use std::sync::{Arc, Condvar, Mutex};
@@ -40,38 +31,6 @@ use std::thread;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
-
-    #[cfg(feature = "ftdi")]
-    let device = ftdi::find_by_vid_pid(0x0403, 0x6014)
-        .interface(ftdi::Interface::A)
-        .open()
-        .unwrap();
-
-    let hal = hal::FtHal::init_default(device).unwrap();
-    let i2c = hal.i2c().unwrap();
-    let address = 0x58;
-    let mut sgp = Sgp30::new(i2c, address, hal::Delay::default());
-    println!("Starting SGP30 tests.");
-    println!();
-    println!("Serial: {:?}", sgp.serial().unwrap());
-    println!("Feature set: {:?}", sgp.get_feature_set().unwrap());
-    println!(
-        "Self-Test: {}",
-        if sgp.selftest().unwrap() {
-            "Pass"
-        } else {
-            "Fail"
-        }
-    );
-    println!();
-    println!("Initializing...");
-    sgp.init().unwrap();
-    let measurements = sgp.measure().unwrap();
-    let signals = sgp.measure_raw_signals().unwrap();
-    println!(
-        "SGP: CO₂eq = {} ppm, TVOC = {} ppb, H2 sig = {}, Ethanol sig = {}",
-        measurements.co2eq_ppm, measurements.tvoc_ppb, signals.h2, signals.ethanol
-    );
 
     let shutdown = Arc::new((Mutex::new(false), Condvar::new()));
     let (tx, rx) = channel();
@@ -83,6 +42,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         io_key: env::var("IO_KEY").expect("Adafruti IO_KEY is not defined."),
     };
     let aio_thread = thread::spawn(move || adafruit::aio_sender(aio_params, rx));
+
+    // Start the sensor thread.
+    let sensor_params = sensor::CallParams {
+        shutdown: shutdown.clone(),
+        tx: tx.clone(),
+    };
+    let sensor_thread = thread::spawn(move || sensor::sensor_updater(sensor_params));
 
     // Start the finance thread.
     let finance_params = finance::CallParams {
@@ -116,6 +82,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         cvar.notify_all();
     })
     .unwrap();
+
+    info!("Waiting for Sensor thread...");
+    sensor_thread
+        .join()
+        .expect("Failed to join sensor_thread.");
 
     info!("Waiting for Finance thread...");
     finance_thread
