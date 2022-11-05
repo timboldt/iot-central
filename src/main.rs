@@ -84,9 +84,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     .unwrap();
 
     info!("Waiting for Sensor thread...");
-    sensor_thread
-        .join()
-        .expect("Failed to join sensor_thread.");
+    sensor_thread.join().expect("Failed to join sensor_thread.");
 
     info!("Waiting for Finance thread...");
     finance_thread

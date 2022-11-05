@@ -48,8 +48,12 @@ pub fn aio_sender(params: CallParams, rx: mpsc::Receiver<Metric>) {
             .multipart(form)
             .send();
         match resp {
-            Ok(r) => { debug!("POST succeeded: {:?}", r.status()); },
-            _ => { debug!("POST failed: {:?}", resp.err()); },
+            Ok(r) => {
+                debug!("POST succeeded: {:?}", r.status());
+            }
+            _ => {
+                debug!("POST failed: {:?}", resp.err());
+            }
         }
     }
     info!("aio_sender finished");

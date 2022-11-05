@@ -58,7 +58,10 @@ pub fn finance_updater(params: CallParams) {
                         params
                             .tx
                             .send(adafruit::Metric {
-                                feed: format!("finance.{}", symbol.to_lowercase().replace(':', "-")),
+                                feed: format!(
+                                    "finance.{}",
+                                    symbol.to_lowercase().replace(':', "-")
+                                ),
                                 value: q.current_price,
                             })
                             .unwrap();

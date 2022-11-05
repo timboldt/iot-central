@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = ["ftdi"]
+default = ["rpi"]
 ftdi = ["dep:ftdi-embedded-hal", "dep:ftdi"]
 rpi = ["dep:linux-embedded-hal"]
 

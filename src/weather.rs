@@ -78,21 +78,27 @@ pub fn weather_updater(params: CallParams) {
                 debug!("GET weather: {:?}", r.status());
                 let w: OneCallWeather = r.json().unwrap_or_default();
                 if w.current.utc_timestamp != 0 {
-                    params.tx.send(adafruit::Metric {
-                        feed: "weather.temp".into(),
-                        value: w.current.temperature,
-                    })
-                    .unwrap();
-                    params.tx.send(adafruit::Metric {
-                        feed: "weather.humidity".into(),
-                        value: w.current.humidity as f32,
-                    })
-                    .unwrap();
-                    params.tx.send(adafruit::Metric {
-                        feed: "weather.pressure".into(),
-                        value: w.current.pressure as f32,
-                    })
-                    .unwrap();
+                    params
+                        .tx
+                        .send(adafruit::Metric {
+                            feed: "weather.temp".into(),
+                            value: w.current.temperature,
+                        })
+                        .unwrap();
+                    params
+                        .tx
+                        .send(adafruit::Metric {
+                            feed: "weather.humidity".into(),
+                            value: w.current.humidity as f32,
+                        })
+                        .unwrap();
+                    params
+                        .tx
+                        .send(adafruit::Metric {
+                            feed: "weather.pressure".into(),
+                            value: w.current.pressure as f32,
+                        })
+                        .unwrap();
                 }
             }
             _ => {
