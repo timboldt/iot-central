@@ -29,10 +29,8 @@ use ftdi_embedded_hal as hal;
 use linux_embedded_hal as hal;
 use log::{debug, error, info};
 use sgp30::Sgp30;
-//use shared_bus::I2cProxy;
 use std::sync::{mpsc, Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
-use tsl2591::Driver;
 
 const UPDATE_PERIOD: Duration = Duration::from_secs(60);
 const SENSOR_PERIOD: Duration = Duration::from_millis(1000);
@@ -70,10 +68,20 @@ pub fn sensor_updater(params: CallParams) {
 
     let i2c = shared_bus::BusManagerSimple::new(i2c);
     let mut bme = BME280::new_secondary(i2c.acquire_i2c(), delay);
+    let mut bme_state = BME280State {
+        sensor_is_valid: false,
+        last_update: Instant::now(),
+        temperature_sum: 0.0,
+        temperature_count: 0,
+        humidity_sum: 0.0,
+        humidity_count: 0,
+        pressure_sum: 0.0,
+        pressure_count: 0,
+    };
     match bme.init() {
         Ok(()) => {
             info!("BME280 initialized");
-            //xxx sgp_state.sensor_is_valid = true;
+            bme_state.sensor_is_valid = true;
         }
         Err(e) => error!("BME280 not found: {:?}", e),
     };
@@ -133,6 +141,9 @@ pub fn sensor_updater(params: CallParams) {
     };
 
     loop {
+        if bme_state.sensor_is_valid {
+            poll_bme280(&mut bme, &mut bme_state, &params.tx);
+        }
         if sgp_state.sensor_is_valid {
             poll_sgp30(&mut sgp, &mut sgp_state, &params.tx);
         }
@@ -152,6 +163,73 @@ pub fn sensor_updater(params: CallParams) {
         }
     }
     info!("sensor_updater finished");
+}
+
+struct BME280State {
+    sensor_is_valid: bool,
+    last_update: Instant,
+    temperature_sum: f32,
+    temperature_count: i32,
+    humidity_sum: f32,
+    humidity_count: i32,
+    pressure_sum: f32,
+    pressure_count: i32,
+}
+
+fn poll_bme280(
+    #[cfg(feature = "ftdi")] bme: &mut BME280<
+        shared_bus::I2cProxy<shared_bus::NullMutex<hal::I2c<ftdi::Device>>>,
+        hal::Delay,
+    >,
+    #[cfg(feature = "rpi")] bme: &mut BME280<
+        shared_bus::I2cProxy<shared_bus::NullMutex<hal::I2cdev>>,
+        hal::Delay,
+    >,
+    state: &mut BME280State,
+    tx: &mpsc::Sender<adafruit::Metric>,
+) {
+    if let Ok(measurements) = bme.measure() {
+        debug!("BME: measurements = {:?}", measurements);
+        state.temperature_sum += measurements.temperature;
+        state.temperature_count += 1;
+        state.humidity_sum += measurements.humidity;
+        state.humidity_count += 1;
+        state.pressure_sum += measurements.pressure;
+        state.pressure_count += 1;
+    }
+
+    let now = Instant::now();
+    if now.duration_since(state.last_update) > UPDATE_PERIOD {
+        if state.temperature_count > 0 {
+            tx.send(adafruit::Metric {
+                feed: "indoor-env.temp".into(),
+                value: state.temperature_sum / state.temperature_count as f32,
+            })
+            .unwrap();
+        }
+        if state.humidity_count > 0 {
+            tx.send(adafruit::Metric {
+                feed: "indoor-env.humidity".into(),
+                value: state.humidity_sum / state.humidity_count as f32,
+            })
+            .unwrap();
+        }
+        if state.pressure_count > 0 {
+            tx.send(adafruit::Metric {
+                feed: "indoor-env.pressure".into(),
+                value: state.pressure_sum / state.pressure_count as f32,
+            })
+            .unwrap();
+        }
+
+        state.temperature_sum = 0.0;
+        state.temperature_count = 0;
+        state.humidity_sum = 0.0;
+        state.humidity_count = 0;
+        state.pressure_sum = 0.0;
+        state.pressure_count = 0;
+        state.last_update = now;
+    }
 }
 
 struct SGP30State {
