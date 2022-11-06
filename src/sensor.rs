@@ -194,7 +194,7 @@ fn poll_bme280(
         state.temperature_count += 1;
         state.humidity_sum += measurements.humidity;
         state.humidity_count += 1;
-        state.pressure_sum += measurements.pressure;
+        state.pressure_sum += measurements.pressure / 100.0; // hPa
         state.pressure_count += 1;
     }
 
