@@ -147,6 +147,9 @@ pub fn sensor_updater(params: CallParams) {
             None
         }
     };
+    if tsl_state.sensor_is_valid {
+        info!("TSL2591 initialized");
+    }
 
     loop {
         if bme_state.sensor_is_valid {
