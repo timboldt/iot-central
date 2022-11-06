@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
-default = ["rpi"]
+default = ["ftdi"]
 ftdi = ["dep:ftdi-embedded-hal", "dep:ftdi"]
 rpi = ["dep:linux-embedded-hal"]
 
@@ -13,6 +13,9 @@ ctrlc = "3.2.3"
 env_logger = "0.9.1"
 log = "0.4.17"
 sgp30 = "0.3.1"
+bme280 = "0.2.1"
+tsl2591 = "0.2.0"
+shared-bus = "0.2.4"
 
 [dependencies.ftdi]
 version = "0.1.3"
