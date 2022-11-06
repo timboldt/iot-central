@@ -86,6 +86,8 @@ pub fn sensor_updater(params: CallParams) {
         Err(e) => error!("BME280 not found: {:?}", e),
     };
 
+    #[cfg(feature = "rpi")]
+    let delay = hal::Delay;
     let sgp30_address = 0x58;
     let mut sgp = Sgp30::new(i2c.acquire_i2c(), sgp30_address, delay);
     let mut sgp_state = SGP30State {
@@ -104,6 +106,8 @@ pub fn sensor_updater(params: CallParams) {
         Err(e) => error!("SGP30 not found: {:?}", e),
     };
 
+    #[cfg(feature = "rpi")]
+    let delay = hal::Delay;
     // TODO: Fix this driver so that it doesn't have to fail during new().
     let mut tsl = tsl2591::Driver::new(i2c.acquire_i2c()).unwrap();
     // let mut tsl = match tsl2591::Driver::new(i2c.acquire_i2c()) {
