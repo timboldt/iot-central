@@ -414,6 +414,7 @@ version = "0.1.0"
 dependencies = [
  "bme280",
  "ctrlc",
+ "embedded-hal 0.2.7",
  "env_logger",
  "ftdi",
  "ftdi-embedded-hal",

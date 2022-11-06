@@ -23,6 +23,7 @@ extern crate ftdi;
 use crate::adafruit;
 
 use bme280::BME280;
+use embedded_hal::blocking::{delay, i2c};
 #[cfg(feature = "ftdi")]
 use ftdi_embedded_hal as hal;
 #[cfg(feature = "rpi")]
@@ -180,20 +181,19 @@ struct BME280State {
     pressure_count: i32,
 }
 
-fn poll_bme280(
-    #[cfg(feature = "ftdi")] bme: &mut BME280<
-        shared_bus::I2cProxy<shared_bus::NullMutex<hal::I2c<ftdi::Device>>>,
-        hal::Delay,
-    >,
-    #[cfg(feature = "rpi")] bme: &mut BME280<
-        shared_bus::I2cProxy<shared_bus::NullMutex<hal::I2cdev>>,
-        hal::Delay,
-    >,
+fn poll_bme280<I2C, D, E>(
+    bme: &mut BME280<I2C, D>,
     state: &mut BME280State,
     tx: &mpsc::Sender<adafruit::Metric>,
-) {
+) where
+    I2C: i2c::Read<Error = E> + i2c::Write<Error = E> + i2c::WriteRead<Error = E>,
+    D: delay::DelayUs<u8> + delay::DelayMs<u8>,
+{
     if let Ok(measurements) = bme.measure() {
-        debug!("BME: measurements = {:?}", measurements);
+        debug!(
+            "BME: temp = {} humid = {} press = {}",
+            measurements.temperature, measurements.humidity, measurements.pressure
+        );
         state.temperature_sum += measurements.temperature;
         state.temperature_count += 1;
         state.humidity_sum += measurements.humidity;
@@ -245,18 +245,14 @@ struct SGP30State {
     tvoc_count: i32,
 }
 
-fn poll_sgp30(
-    #[cfg(feature = "ftdi")] sgp: &mut Sgp30<
-        shared_bus::I2cProxy<shared_bus::NullMutex<hal::I2c<ftdi::Device>>>,
-        hal::Delay,
-    >,
-    #[cfg(feature = "rpi")] sgp: &mut Sgp30<
-        shared_bus::I2cProxy<shared_bus::NullMutex<hal::I2cdev>>,
-        hal::Delay,
-    >,
+fn poll_sgp30<I2C, D, E>(
+    sgp: &mut Sgp30<I2C, D>,
     state: &mut SGP30State,
     tx: &mpsc::Sender<adafruit::Metric>,
-) {
+) where
+    I2C: i2c::Read<Error = E> + i2c::Write<Error = E> + i2c::WriteRead<Error = E>,
+    D: delay::DelayUs<u16> + delay::DelayMs<u16>,
+{
     let measurements = sgp.measure().unwrap_or(sgp30::Measurement {
         co2eq_ppm: 0,
         tvoc_ppb: 0,
@@ -307,16 +303,13 @@ struct TSL2591State {
     lux_count: i32,
 }
 
-fn poll_tsl2591(
-    #[cfg(feature = "ftdi")] tsl: &mut tsl2591::Driver<
-        shared_bus::I2cProxy<shared_bus::NullMutex<hal::I2c<ftdi::Device>>>,
-    >,
-    #[cfg(feature = "rpi")] tsl: &mut tsl2591::Driver<
-        shared_bus::I2cProxy<shared_bus::NullMutex<hal::I2cdev>>,
-    >,
+fn poll_tsl2591<I2C, E>(
+    tsl: &mut tsl2591::Driver<I2C>,
     state: &mut TSL2591State,
     tx: &mpsc::Sender<adafruit::Metric>,
-) {
+) where
+    I2C: i2c::Read<Error = E> + i2c::Write<Error = E> + i2c::WriteRead<Error = E>,
+{
     let (ch_0, ch_1) = tsl
         .get_channel_data(&mut state.delay)
         .unwrap_or((0xFFFF, 0xFFFF));
