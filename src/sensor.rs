@@ -118,7 +118,7 @@ pub fn sensor_updater(params: CallParams) {
     //     }
     // };
     let mut tsl_state = TSL2591State {
-        sensor_is_valid: false,
+        sensor_is_valid: true,
         delay: delay,
         last_update: Instant::now(),
         lux_sum: 0.0,
