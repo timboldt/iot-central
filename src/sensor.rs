@@ -109,15 +109,6 @@ pub fn sensor_updater(params: CallParams) {
 
     #[cfg(feature = "rpi")]
     let delay = hal::Delay;
-    // TODO: Fix this driver so that it doesn't have to fail during new().
-    let mut tsl = tsl2591::Driver::new(i2c.acquire_i2c()).unwrap();
-    // let mut tsl = match tsl2591::Driver::new(i2c.acquire_i2c()) {
-    //     Ok(mut t) => Some(mut t),
-    //     Err(e) => {
-    //         error!("TSL2591 not found: {:?}", e);
-    //         None
-    //     }
-    // };
     let mut tsl_state = TSL2591State {
         sensor_is_valid: true,
         delay: delay,
@@ -125,23 +116,35 @@ pub fn sensor_updater(params: CallParams) {
         lux_sum: 0.0,
         lux_count: 0,
     };
-
-    match tsl.enable() {
-        Ok(()) => {}
-        Err(e) => {
-            error!("TSL2591 not enabled: {:?}", e);
+    let mut tsl = match tsl2591::Driver::new(i2c.acquire_i2c()) {
+        Ok(mut t) => {
+            match t.enable() {
+                Ok(()) => {}
+                Err(e) => {
+                    tsl_state.sensor_is_valid = false;
+                    error!("TSL2591 not enabled: {:?}", e);
+                }
+            };
+            match t.set_timing(None) {
+                Ok(()) => {}
+                Err(e) => {
+                    tsl_state.sensor_is_valid = false;
+                    error!("TSL2591 timing not set: {:?}", e);
+                }
+            };
+            match t.set_gain(None) {
+                Ok(()) => {}
+                Err(e) => {
+                    tsl_state.sensor_is_valid = false;
+                    error!("TSL2591 gain not set: {:?}", e);
+                }
+            };
+            Some(t)
         }
-    };
-    match tsl.set_timing(None) {
-        Ok(()) => {}
         Err(e) => {
-            error!("TSL2591 timing not set: {:?}", e);
-        }
-    };
-    match tsl.set_gain(None) {
-        Ok(()) => {}
-        Err(e) => {
-            error!("TSL2591 gain not set: {:?}", e);
+            tsl_state.sensor_is_valid = false;
+            error!("TSL2591 not found: {:?}", e);
+            None
         }
     };
 
@@ -153,7 +156,9 @@ pub fn sensor_updater(params: CallParams) {
             poll_sgp30(&mut sgp, &mut sgp_state, &params.tx);
         }
         if tsl_state.sensor_is_valid {
-            poll_tsl2591(&mut tsl, &mut tsl_state, &params.tx);
+            if let Some(t) = tsl.as_mut() {
+                poll_tsl2591(t, &mut tsl_state, &params.tx);
+            }
         }
 
         // Wait for next sensor period, or shutdown signal.
