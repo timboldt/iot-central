@@ -21,6 +21,7 @@ compile_error!("feature \"ftdi\" and feature \"rpi\" cannot be enabled at the sa
 extern crate ftdi;
 
 use crate::adafruit;
+use crate::conversion;
 
 use bme280::BME280;
 use embedded_hal::blocking::{delay, i2c};
@@ -73,11 +74,9 @@ pub fn sensor_updater(params: CallParams) {
         sensor_is_valid: false,
         last_update: Instant::now(),
         temperature_sum: 0.0,
-        temperature_count: 0,
         humidity_sum: 0.0,
-        humidity_count: 0,
         pressure_sum: 0.0,
-        pressure_count: 0,
+        count: 0,
     };
     match bme.init() {
         Ok(()) => {
@@ -111,7 +110,7 @@ pub fn sensor_updater(params: CallParams) {
     let delay = hal::Delay;
     let mut tsl_state = TSL2591State {
         sensor_is_valid: true,
-        delay: delay,
+        delay,
         last_update: Instant::now(),
         lux_sum: 0.0,
         lux_count: 0,
@@ -182,11 +181,9 @@ struct BME280State {
     sensor_is_valid: bool,
     last_update: Instant,
     temperature_sum: f32,
-    temperature_count: i32,
     humidity_sum: f32,
-    humidity_count: i32,
     pressure_sum: f32,
-    pressure_count: i32,
+    count: i32,
 }
 
 fn poll_bme280<I2C, D, E>(
@@ -200,46 +197,69 @@ fn poll_bme280<I2C, D, E>(
     if let Ok(measurements) = bme.measure() {
         debug!(
             "BME: temp = {} humid = {} press = {}",
-            measurements.temperature, measurements.humidity, measurements.pressure
+            measurements.temperature, measurements.humidity, measurements.pressure,
         );
         state.temperature_sum += measurements.temperature;
-        state.temperature_count += 1;
         state.humidity_sum += measurements.humidity;
-        state.humidity_count += 1;
-        state.pressure_sum += measurements.pressure / 100.0; // hPa
-        state.pressure_count += 1;
+        state.pressure_sum += measurements.pressure;
+        state.count += 1;
     }
 
     let now = Instant::now();
     if now.duration_since(state.last_update) > UPDATE_PERIOD {
-        if state.temperature_count > 0 {
+        if state.count > 0 {
+            let celsius = state.temperature_sum / state.count as f32;
+            let relative_humidity = state.humidity_sum / state.count as f32;
+            let raw_pressure_hpa = state.pressure_sum / state.count as f32 / 100.0;
+
             tx.send(adafruit::Metric {
-                feed: "indoor-env.temp".into(),
-                value: state.temperature_sum / state.temperature_count as f32,
+                feed: "mbr-bme280.temperature".into(),
+                value: celsius,
             })
             .unwrap();
-        }
-        if state.humidity_count > 0 {
             tx.send(adafruit::Metric {
-                feed: "indoor-env.humidity".into(),
-                value: state.humidity_sum / state.humidity_count as f32,
+                feed: "mbr-bme280.humidity".into(),
+                value: relative_humidity,
             })
             .unwrap();
-        }
-        if state.pressure_count > 0 {
             tx.send(adafruit::Metric {
-                feed: "indoor-env.pressure".into(),
-                value: state.pressure_sum / state.pressure_count as f32,
+                feed: "mbr-bme280.pressure".into(),
+                value: raw_pressure_hpa,
+            })
+            .unwrap();
+
+            let fahrenheit = conversion::celsius_to_fahrenheit(celsius);
+            let kelvin = conversion::celsius_to_kelvin(celsius);
+            let absolute_humidity =
+                conversion::relative_humidity_to_absolute(relative_humidity, kelvin);
+            let sealevel_pressure = conversion::raw_pressure_to_sealevel(raw_pressure_hpa, kelvin);
+
+            tx.send(adafruit::Metric {
+                feed: "mbr.temperature".into(),
+                value: fahrenheit,
+            })
+            .unwrap();
+            tx.send(adafruit::Metric {
+                feed: "mbr.humidity".into(),
+                value: relative_humidity,
+            })
+            .unwrap();
+            tx.send(adafruit::Metric {
+                feed: "mbr.abs-humidity".into(),
+                value: absolute_humidity,
+            })
+            .unwrap();
+            tx.send(adafruit::Metric {
+                feed: "mbr.pressure".into(),
+                value: sealevel_pressure,
             })
             .unwrap();
         }
 
         state.temperature_sum = 0.0;
-        state.temperature_count = 0;
         state.humidity_sum = 0.0;
-        state.humidity_count = 0;
         state.pressure_sum = 0.0;
-        state.pressure_count = 0;
+        state.count = 0;
         state.last_update = now;
     }
 }

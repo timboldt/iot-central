@@ -19,6 +19,7 @@ extern crate reqwest;
 extern crate serde;
 
 mod adafruit;
+mod conversion;
 mod finance;
 mod sensor;
 mod weather;
