@@ -31,13 +31,16 @@ pub fn raw_pressure_to_sealevel(raw_hpa: f32, kelvin: f32) -> f32 {
     raw_hpa * (1.0 - 0.0065 * ALTITUDE / (0.0065 + kelvin)).powf(-5.257)
 }
 
+pub fn hpa_to_inhg(hpa: f32) -> f32 {
+    hpa / 33.863886666667
+}
+
 // https://carnotcycle.wordpress.com/2012/08/04/how-to-convert-relative-humidity-to-absolute-humidity/
 // relative_humidity should be a percentage value between 0 and 100.
 // Output is in grams per cubic meter.
 pub fn relative_humidity_to_absolute(relative_humidity: f32, kelvin: f32) -> f32 {
     let above_freezing = kelvin - 273.15;
-    let saturating_pressure =
-        6.112 * consts::E.powf(17.67 * above_freezing / (kelvin - 29.65));
+    let saturating_pressure = 6.112 * consts::E.powf(17.67 * above_freezing / (kelvin - 29.65));
     let pressure = saturating_pressure * relative_humidity / 100.0;
     pressure * 216.74 / kelvin
 }
@@ -54,6 +57,11 @@ mod tests {
     #[test]
     fn c_to_k_works() {
         assert_eq!(293.15, celsius_to_kelvin(20.0));
+    }
+
+    #[test]
+    fn hpa_to_inhg_works() {
+        assert_eq!(29.9, (hpa_to_inhg(1013.25) * 10.0).round() / 10.0);
     }
 
     #[test]
