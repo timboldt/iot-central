@@ -113,7 +113,9 @@ pub fn sensor_updater(params: CallParams) {
         delay,
         last_update: Instant::now(),
         lux_sum: 0.0,
-        lux_count: 0,
+        full_spectrum_sum: 0.0,
+        infrared_sum: 0.0,
+        count: 0,
     };
     let mut tsl = match tsl2591::Driver::new(i2c.acquire_i2c()) {
         Ok(mut t) => {

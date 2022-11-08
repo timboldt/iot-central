@@ -31,7 +31,9 @@ where
     pub delay: D,
     pub last_update: Instant,
     pub lux_sum: f32,
-    pub lux_count: i32,
+    pub full_spectrum_sum: f32,
+    pub infrared_sum: f32,
+    pub count: i32,
 }
 
 pub fn poll<I2C, D, E>(
@@ -50,21 +52,39 @@ pub fn poll<I2C, D, E>(
     if !lux.is_nan() {
         debug!("TSL2591: lux = {}", lux);
         state.lux_sum += lux / GAIN_FACTOR;
-        state.lux_count += 1;
+        state.full_spectrum_sum += ch_0 as f32;
+        state.infrared_sum += ch_1 as f32;
+        state.count += 1;
     }
 
     let now = Instant::now();
     if now.duration_since(state.last_update) > UPDATE_PERIOD {
-        if state.lux_count > 0 {
+        if state.count > 0 {
             tx.send(adafruit::Metric {
-                feed: "indoor-env.lux".into(),
-                value: state.lux_sum / state.lux_count as f32,
+                feed: "mbr-tsl2591.lux".into(),
+                value: state.lux_sum / state.count as f32,
+            })
+            .unwrap();
+            tx.send(adafruit::Metric {
+                feed: "mbr-tsl2591.full-spectrum".into(),
+                value: state.full_spectrum_sum / state.count as f32,
+            })
+            .unwrap();
+            tx.send(adafruit::Metric {
+                feed: "mbr-tsl2591.infrared".into(),
+                value: state.infrared_sum / state.count as f32,
+            })
+            .unwrap();
+
+            tx.send(adafruit::Metric {
+                feed: "mbr.lux".into(),
+                value: state.lux_sum / state.count as f32,
             })
             .unwrap();
         }
 
         state.lux_sum = 0.0;
-        state.lux_count = 0;
+        state.count = 0;
         state.last_update = now;
     }
 }
