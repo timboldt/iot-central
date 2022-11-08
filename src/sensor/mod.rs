@@ -131,7 +131,7 @@ pub fn sensor_updater(params: CallParams) {
                     error!("TSL2591 timing not set: {:?}", e);
                 }
             };
-            match t.set_gain(None) {
+            match t.set_gain(Some(tsl2591::Gain::MED)) {
                 Ok(()) => {}
                 Err(e) => {
                     tsl_state.sensor_is_valid = false;

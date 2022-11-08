@@ -24,6 +24,7 @@ use log::debug;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
+const GAIN_FACTOR: f32 = 25.0;  // Medium Gain is 25x.
 const UPDATE_PERIOD: Duration = Duration::from_secs(60);
 
 pub struct State {
@@ -48,7 +49,7 @@ pub fn poll<I2C, E>(
 
     if !lux.is_nan() {
         debug!("TSL2591: lux = {}", lux);
-        state.lux_sum += lux;
+        state.lux_sum += lux / GAIN_FACTOR;
         state.lux_count += 1;
     }
 
