@@ -25,6 +25,7 @@ const UPDATE_PERIOD: Duration = Duration::from_secs(60);
 
 pub struct State {
     pub sensor_is_valid: bool,
+    pub abs_humidity: f32,
     pub last_update: Instant,
     pub co2_sum: f32,
     pub co2_count: i32,
@@ -40,6 +41,9 @@ pub fn poll<I2C, D, E>(
     I2C: i2c::Read<Error = E> + i2c::Write<Error = E> + i2c::WriteRead<Error = E>,
     D: delay::DelayUs<u16> + delay::DelayMs<u16>,
 {
+    if let Ok(humidity) = sgp30::Humidity::from_f32(state.abs_humidity) {
+        let _ = sgp.set_humidity(Some(&humidity));
+    }
     let measurements = sgp.measure().unwrap_or(sgp30::Measurement {
         co2eq_ppm: 0,
         tvoc_ppb: 0,

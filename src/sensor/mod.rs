@@ -35,6 +35,7 @@ use sgp30::Sgp30;
 use std::sync::{mpsc, Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
+const DEFAULT_ABS_HUMIDITY: f32 = 10.5;
 const SENSOR_PERIOD: Duration = Duration::from_millis(1000);
 
 #[derive(Debug)]
@@ -72,6 +73,7 @@ pub fn sensor_updater(params: CallParams) {
     let mut bme = BME280::new_secondary(i2c.acquire_i2c(), delay);
     let mut bme_state = bme::State {
         sensor_is_valid: false,
+        last_abs_humidity: DEFAULT_ABS_HUMIDITY,
         last_update: Instant::now(),
         temperature_sum: 0.0,
         humidity_sum: 0.0,
@@ -92,6 +94,7 @@ pub fn sensor_updater(params: CallParams) {
     let mut sgp = Sgp30::new(i2c.acquire_i2c(), sgp30_address, delay);
     let mut sgp_state = sgp::State {
         sensor_is_valid: false,
+        abs_humidity: DEFAULT_ABS_HUMIDITY,
         last_update: Instant::now(),
         co2_sum: 0.0,
         co2_count: 0,
@@ -157,6 +160,7 @@ pub fn sensor_updater(params: CallParams) {
             bme::poll(&mut bme, &mut bme_state, &params.tx);
         }
         if sgp_state.sensor_is_valid {
+            sgp_state.abs_humidity = bme_state.last_abs_humidity;
             sgp::poll(&mut sgp, &mut sgp_state, &params.tx);
         }
         if tsl_state.sensor_is_valid {

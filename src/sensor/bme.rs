@@ -26,6 +26,7 @@ const UPDATE_PERIOD: Duration = Duration::from_secs(60);
 
 pub struct State {
     pub sensor_is_valid: bool,
+    pub last_abs_humidity: f32,
     pub last_update: Instant,
     pub temperature_sum: f32,
     pub humidity_sum: f32,
@@ -77,7 +78,7 @@ pub fn poll<I2C, D, E>(
 
             let fahrenheit = conversion::celsius_to_fahrenheit(celsius);
             let kelvin = conversion::celsius_to_kelvin(celsius);
-            let absolute_humidity =
+            state.last_abs_humidity =
                 conversion::relative_humidity_to_absolute(relative_humidity, kelvin);
             let sealevel_pressure = conversion::hpa_to_inhg(conversion::raw_pressure_to_sealevel(
                 raw_pressure_hpa,
@@ -96,7 +97,7 @@ pub fn poll<I2C, D, E>(
             .unwrap();
             tx.send(adafruit::Metric {
                 feed: "mbr.abs-humidity".into(),
-                value: absolute_humidity,
+                value: state.last_abs_humidity,
             })
             .unwrap();
             tx.send(adafruit::Metric {
