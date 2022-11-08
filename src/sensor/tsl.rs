@@ -84,6 +84,8 @@ pub fn poll<I2C, D, E>(
         }
 
         state.lux_sum = 0.0;
+        state.full_spectrum_sum = 0.0;
+        state.infrared_sum = 0.0;
         state.count = 0;
         state.last_update = now;
     }
