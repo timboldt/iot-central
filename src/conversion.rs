@@ -32,7 +32,7 @@ pub fn raw_pressure_to_sealevel(raw_hpa: f32, kelvin: f32) -> f32 {
 }
 
 pub fn hpa_to_inhg(hpa: f32) -> f32 {
-    hpa / 33.863886666667
+    hpa / 33.863_888
 }
 
 // https://carnotcycle.wordpress.com/2012/08/04/how-to-convert-relative-humidity-to-absolute-humidity/
