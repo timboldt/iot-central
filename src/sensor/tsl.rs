@@ -15,32 +15,32 @@
 #![warn(clippy::all)]
 
 use crate::adafruit;
-use embedded_hal::blocking::i2c;
-#[cfg(feature = "ftdi")]
-use ftdi_embedded_hal as hal;
-#[cfg(feature = "rpi")]
-use linux_embedded_hal as hal;
+use embedded_hal::blocking::{delay, i2c};
 use log::debug;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-const GAIN_FACTOR: f32 = 25.0;  // Medium Gain is 25x.
+const GAIN_FACTOR: f32 = 25.0; // Medium Gain is 25x.
 const UPDATE_PERIOD: Duration = Duration::from_secs(60);
 
-pub struct State {
+pub struct State<D>
+where
+    D: delay::DelayUs<u8> + delay::DelayMs<u8>,
+{
     pub sensor_is_valid: bool,
-    pub delay: hal::Delay,
+    pub delay: D,
     pub last_update: Instant,
     pub lux_sum: f32,
     pub lux_count: i32,
 }
 
-pub fn poll<I2C, E>(
+pub fn poll<I2C, D, E>(
     tsl: &mut tsl2591::Driver<I2C>,
-    state: &mut State,
+    state: &mut State<D>,
     tx: &mpsc::Sender<adafruit::Metric>,
 ) where
     I2C: i2c::Read<Error = E> + i2c::Write<Error = E> + i2c::WriteRead<Error = E>,
+    D: delay::DelayUs<u8> + delay::DelayMs<u8>,
 {
     let (ch_0, ch_1) = tsl
         .get_channel_data(&mut state.delay)
