@@ -156,6 +156,8 @@ pub fn sensor_updater(params: CallParams) {
     }
 
     loop {
+        let last_update = Instant::now();
+
         if bme_state.sensor_is_valid {
             bme::poll(&mut bme, &mut bme_state, &params.tx);
         }
@@ -170,11 +172,10 @@ pub fn sensor_updater(params: CallParams) {
         }
 
         // Wait for next sensor period, or shutdown signal.
+        let wait_time = SENSOR_PERIOD - Instant::now().duration_since(last_update);
         let (lock, cvar) = &*params.shutdown;
         let shutdown = cvar
-            .wait_timeout_while(lock.lock().unwrap(), SENSOR_PERIOD, |&mut shutdown| {
-                !shutdown
-            })
+            .wait_timeout_while(lock.lock().unwrap(), wait_time, |&mut shutdown| !shutdown)
             .unwrap();
         if *shutdown.0 {
             break;
