@@ -97,6 +97,11 @@ pub fn poll<I2C, D, E>(
                 value: state.lux_sum / state.count as f32,
             })
             .unwrap();
+            tx.send(adafruit::Metric {
+                feed: "mbr.lux-db".into(),
+                value: 10. * (state.lux_sum / state.count as f32).log10(),
+            })
+            .unwrap();
         }
 
         state.lux_sum = 0.0;
@@ -158,12 +163,13 @@ fn calculate_lux<D>(state: &State<D>, ch_0: u16, ch_1: u16) -> f32
 where
     D: delay::DelayUs<u8> + delay::DelayMs<u8>,
 {
-    if (ch_0 == 0xFFFF) | (ch_1 == 0xFFFF) {
+    const TSL2591_LUX_DF: f32 = 53.;
+    const CH1_IR_COEFF: f32 = 1.7; // For subtracting IR from full spectrum.
+    const CH1_VISIBLE_COEFF: f32 = 1.0; // For estimating visible from IR.
+    const OVERFLOW: u16 = 0xFFFF;
+
+    if (ch_0 == OVERFLOW) && (ch_1 == OVERFLOW) {
         // Signal an overflow.
-        return f32::NAN;
-    }
-    if ch_0 == 0 {
-        // Signal an underflow.
         return f32::NAN;
     }
 
@@ -178,7 +184,13 @@ where
 
     let a_gain = gain_factor(state.gain);
 
-    const TSL2591_LUX_DF: f32 = 53.;
-    let lux = (ch_0 as f32 - 1.7 * ch_1 as f32) * TSL2591_LUX_DF / a_time / a_gain;
-    f32::max(lux, 0.)
+    let lux = if ch_0 != OVERFLOW && ch_0 as f32 > CH1_IR_COEFF * ch_1 as f32 {
+        ch_0 as f32 - CH1_IR_COEFF * ch_1 as f32
+    } else if ch_1 != OVERFLOW {
+        ch_1 as f32 * CH1_VISIBLE_COEFF
+    } else {
+        f32::NAN
+    };
+
+    lux * TSL2591_LUX_DF / a_time / a_gain
 }
