@@ -31,6 +31,9 @@ pub struct State {
     pub co2_count: i32,
     pub tvoc_sum: f32,
     pub tvoc_count: i32,
+    pub raw_h2_sum: f32,
+    pub raw_ethanol_sum: f32,
+    pub raw_count: i32,
 }
 
 pub fn poll<I2C, D, E>(
@@ -48,6 +51,9 @@ pub fn poll<I2C, D, E>(
         co2eq_ppm: 0,
         tvoc_ppb: 0,
     });
+    let raw = sgp
+        .measure_raw_signals()
+        .unwrap_or(sgp30::RawSignals { h2: 0, ethanol: 0 });
 
     if measurements.co2eq_ppm != 400 {
         debug!("SGP: CO₂eq = {}", measurements.co2eq_ppm);
@@ -59,12 +65,17 @@ pub fn poll<I2C, D, E>(
         state.tvoc_sum += measurements.tvoc_ppb as f32;
         state.tvoc_count += 1;
     }
+    if raw.h2 > 0 || raw.ethanol > 0 {
+        state.raw_h2_sum += raw.h2 as f32;
+        state.raw_ethanol_sum += raw.ethanol as f32;
+        state.raw_count += 1;
+    }
 
     let now = Instant::now();
     if now.duration_since(state.last_update) > UPDATE_PERIOD {
         if state.co2_count > 0 {
             tx.send(adafruit::Metric {
-                feed: "indoor-env.co2".into(),
+                feed: "mbr-sgp30.co2".into(),
                 value: state.co2_sum / state.co2_count as f32,
             })
             .unwrap();
@@ -72,8 +83,21 @@ pub fn poll<I2C, D, E>(
 
         if state.tvoc_count > 0 {
             tx.send(adafruit::Metric {
-                feed: "indoor-env.tvoc".into(),
+                feed: "mbr-sgp30.tvoc".into(),
                 value: state.tvoc_sum / state.tvoc_count as f32,
+            })
+            .unwrap();
+        }
+
+        if state.raw_count > 0 {
+            tx.send(adafruit::Metric {
+                feed: "mbr-sgp30.raw-h2".into(),
+                value: state.raw_h2_sum / state.raw_count as f32,
+            })
+            .unwrap();
+            tx.send(adafruit::Metric {
+                feed: "mbr-sgp30.raw-ethanol".into(),
+                value: state.raw_ethanol_sum / state.raw_count as f32,
             })
             .unwrap();
         }
@@ -83,5 +107,8 @@ pub fn poll<I2C, D, E>(
         state.tvoc_sum = 0.0;
         state.tvoc_count = 0;
         state.last_update = now;
+        state.raw_h2_sum = 0.0;
+        state.raw_ethanol_sum = 0.0;
+        state.raw_count = 0;
     }
 }

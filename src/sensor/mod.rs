@@ -100,6 +100,9 @@ pub fn sensor_updater(params: CallParams) {
         co2_count: 0,
         tvoc_sum: 0.0,
         tvoc_count: 0,
+        raw_h2_sum: 0.0,
+        raw_ethanol_sum: 0.0,
+        raw_count: 0,
     };
     match sgp.init() {
         Ok(()) => {
