@@ -27,22 +27,21 @@ pub fn celsius_to_kelvin(celsius: f32) -> f32 {
     celsius + 273.15
 }
 
-pub fn raw_pressure_to_sealevel(raw_hpa: f32, kelvin: f32) -> f32 {
-    raw_hpa * (1.0 - 0.0065 * ALTITUDE / (0.0065 + kelvin)).powf(-5.257)
+pub fn raw_pressure_to_sealevel(raw_hpa: f32, celsius: f32) -> f32 {
+    raw_hpa * (1.0 - 0.0065 * ALTITUDE / (0.0065 + celsius_to_kelvin(celsius))).powf(-5.257)
 }
 
 pub fn hpa_to_inhg(hpa: f32) -> f32 {
     hpa / 33.863_888
 }
 
-// https://carnotcycle.wordpress.com/2012/08/04/how-to-convert-relative-humidity-to-absolute-humidity/
+// https://sensirion.com/media/documents/984E0DD5/61644B8B/Sensirion_Gas_Sensors_Datasheet_SGP30.pdf
 // relative_humidity should be a percentage value between 0 and 100.
 // Output is in grams per cubic meter.
-pub fn relative_humidity_to_absolute(relative_humidity: f32, kelvin: f32) -> f32 {
-    let above_freezing = kelvin - 273.15;
-    let saturating_pressure = 6.112 * consts::E.powf(17.67 * above_freezing / (kelvin - 29.65));
+pub fn relative_humidity_to_absolute(relative_humidity: f32, celsius: f32) -> f32 {
+    let saturating_pressure = 6.112 * consts::E.powf(17.62 * celsius / (243.12 + celsius));
     let pressure = saturating_pressure * relative_humidity / 100.0;
-    pressure * 216.74 / kelvin
+    216.7 * pressure / celsius_to_kelvin(celsius)
 }
 
 #[cfg(test)]
@@ -68,27 +67,27 @@ mod tests {
     fn rp_to_s_works() {
         assert_eq!(
             1_012.0,
-            raw_pressure_to_sealevel(1000.0, celsius_to_kelvin(15.0)).round()
+            raw_pressure_to_sealevel(1000.0, 15.0).round()
         );
         assert_eq!(
             1_025.0,
-            raw_pressure_to_sealevel(1_013.25, celsius_to_kelvin(15.0)).round()
+            raw_pressure_to_sealevel(1_013.25, 15.0).round()
         );
         assert_eq!(
             1_010.0,
-            raw_pressure_to_sealevel(999.0, celsius_to_kelvin(40.0)).round()
+            raw_pressure_to_sealevel(999.0, 40.0).round()
         );
         assert_eq!(
             1_010.0,
-            raw_pressure_to_sealevel(999.0, celsius_to_kelvin(40.0)).round()
+            raw_pressure_to_sealevel(999.0, 40.0).round()
         );
     }
 
     #[test]
     fn rh_to_ah_works() {
         assert_eq!(
-            6.41,
-            (relative_humidity_to_absolute(50.0, celsius_to_kelvin(15.0)) * 100.0).round() / 100.0
+            6.4,
+            (relative_humidity_to_absolute(50.0, 15.0) * 100.0).round() / 100.0
         );
     }
 }

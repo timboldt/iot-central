@@ -77,12 +77,11 @@ pub fn poll<I2C, D, E>(
             .unwrap();
 
             let fahrenheit = conversion::celsius_to_fahrenheit(celsius);
-            let kelvin = conversion::celsius_to_kelvin(celsius);
             state.last_abs_humidity =
-                conversion::relative_humidity_to_absolute(relative_humidity, kelvin);
+                conversion::relative_humidity_to_absolute(relative_humidity, celsius);
             let sealevel_pressure = conversion::hpa_to_inhg(conversion::raw_pressure_to_sealevel(
                 raw_pressure_hpa,
-                kelvin,
+                celsius,
             ));
 
             tx.send(adafruit::Metric {
