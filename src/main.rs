@@ -57,7 +57,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         tx: tx.clone(),
         base_url: "https://finnhub.io/api/v1/quote".to_owned(),
         api_key: env::var("FINHUB_API_KEY").expect("FINHUB_API_KEY is not defined."),
-        symbols: vec!["DIA".into(), "COINBASE:BTC-USD".into(), "QQQ".into()],
+        symbols: vec![
+            "DIA".into(),
+            "COINBASE:BTC-USD".into(),
+            "BITFINEX:USTUSD".into(),
+            "KRAKEN:USDTZUSD".into(),
+            "QQQ".into(),
+        ],
     };
     let finance_thread = thread::spawn(move || finance::finance_updater(finance_params));
 
