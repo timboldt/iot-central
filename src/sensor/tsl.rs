@@ -16,7 +16,7 @@
 
 use crate::adafruit;
 use embedded_hal::blocking::{delay, i2c};
-use log::debug;
+use log::{debug, error};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use tsl2591::{Gain, IntegrationTimes};
@@ -60,6 +60,10 @@ pub fn poll<I2C, D, E>(
     }
 
     adjust_gain(state, ch_0, ch_1);
+    match tsl.set_gain(Some(state.gain)) {
+        Ok(_) => debug!("TSL2591 gain: {}", gain_factor(state.gain)),
+        Err(_) => error!("TSL2591 set_gain() failed"),
+    };
 
     let now = Instant::now();
     if now.duration_since(state.last_update) > UPDATE_PERIOD {
@@ -77,6 +81,11 @@ pub fn poll<I2C, D, E>(
             tx.send(adafruit::Metric {
                 feed: "mbr-tsl2591.infrared".into(),
                 value: state.infrared_sum / state.count as f32,
+            })
+            .unwrap();
+            tx.send(adafruit::Metric {
+                feed: "mbr-tsl2591.gain".into(),
+                value: gain_factor(state.gain) as f32,
             })
             .unwrap();
 
@@ -168,9 +177,10 @@ where
 
     const TSL2591_LUX_DF: f32 = 408.;
     let cpl = (a_time * a_gain) / TSL2591_LUX_DF;
-    // let lux = (ch_0 as f32 - ch_1 as f32) * (1.0 - (ch_1 as f32 / ch_0 as f32)) / cpl;
-    // Alternative formula, per Adafruit:
-    let lux = (ch_0 as f32 - 1.7 * ch_1 as f32) / cpl;
+    let lux = (ch_0 as f32 - ch_1 as f32) * (1.0 - (ch_1 as f32 / ch_0 as f32)) / cpl;
 
-    lux
+    // Alternative formula, per Adafruit:
+    // let lux = (ch_0 as f32 - 1.7 * ch_1 as f32) / cpl;
+
+    f32::max(lux, 0.)
 }

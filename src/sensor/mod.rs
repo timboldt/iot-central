@@ -122,7 +122,7 @@ pub fn sensor_updater(params: CallParams) {
         infrared_sum: 0.0,
         count: 0,
     };
-    let mut tsl = match tsl2591::Driver::new(i2c.acquire_i2c()) {
+    let mut tsl = match tsl2591::Driver::new_define_integration(i2c.acquire_i2c(), tsl_state.integ_time, tsl_state.gain) {
         Ok(mut t) => {
             match t.enable() {
                 Ok(()) => {}
