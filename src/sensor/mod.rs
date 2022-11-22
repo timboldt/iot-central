@@ -114,6 +114,8 @@ pub fn sensor_updater(params: CallParams) {
     let mut tsl_state = tsl::State {
         sensor_is_valid: true,
         delay,
+        integ_time: tsl2591::IntegrationTimes::_100MS,
+        gain: tsl2591::Gain::MED,
         last_update: Instant::now(),
         lux_sum: 0.0,
         full_spectrum_sum: 0.0,
@@ -129,14 +131,14 @@ pub fn sensor_updater(params: CallParams) {
                     error!("TSL2591 not enabled: {:?}", e);
                 }
             };
-            match t.set_timing(None) {
+            match t.set_timing(Some(tsl_state.integ_time)) {
                 Ok(()) => {}
                 Err(e) => {
                     tsl_state.sensor_is_valid = false;
                     error!("TSL2591 timing not set: {:?}", e);
                 }
             };
-            match t.set_gain(Some(tsl2591::Gain::MED)) {
+            match t.set_gain(Some(tsl_state.gain)) {
                 Ok(()) => {}
                 Err(e) => {
                     tsl_state.sensor_is_valid = false;
