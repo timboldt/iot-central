@@ -59,11 +59,14 @@ pub fn poll<I2C, D, E>(
         state.count += 1;
     }
 
+    let gain_before = state.gain;
     adjust_gain(state, ch_0, ch_1);
-    match tsl.set_gain(Some(state.gain)) {
-        Ok(_) => debug!("TSL2591 gain: {}", gain_factor(state.gain)),
-        Err(_) => error!("TSL2591 set_gain() failed"),
-    };
+    if state.gain as u8 != gain_before as u8 {
+        match tsl.set_gain(Some(state.gain)) {
+            Ok(_) => debug!("TSL2591 gain: {}", gain_factor(state.gain)),
+            Err(_) => error!("TSL2591 set_gain() failed"),
+        };
+    }
 
     let now = Instant::now();
     if now.duration_since(state.last_update) > UPDATE_PERIOD {
@@ -175,12 +178,7 @@ where
 
     let a_gain = gain_factor(state.gain);
 
-    const TSL2591_LUX_DF: f32 = 408.;
-    let cpl = (a_time * a_gain) / TSL2591_LUX_DF;
-    let lux = (ch_0 as f32 - ch_1 as f32) * (1.0 - (ch_1 as f32 / ch_0 as f32)) / cpl;
-
-    // Alternative formula, per Adafruit:
-    // let lux = (ch_0 as f32 - 1.7 * ch_1 as f32) / cpl;
-
+    const TSL2591_LUX_DF: f32 = 53.;
+    let lux = (ch_0 as f32 - 1.7 * ch_1 as f32) * TSL2591_LUX_DF / a_time / a_gain;
     f32::max(lux, 0.)
 }
