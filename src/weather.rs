@@ -19,8 +19,9 @@ use crate::adafruit;
 //use chrono::{offset::TimeZone, Local, Utc};
 use log::{debug, info};
 use serde::Deserialize;
-use std::sync::{mpsc, Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
+use tokio::sync::mpsc;
 
 #[derive(Debug)]
 pub struct CallParams {
@@ -53,18 +54,10 @@ struct CurrentConditions {
     // weather: Vec<WeatherInfo>,
 }
 
-// #[derive(Deserialize, Debug, Default)]
-// struct WeatherInfo {
-//     id: i16,
-//     main: String,
-//     description: String,
-//     icon: String,
-// }
-
-pub fn weather_updater(params: CallParams) {
+pub async fn weather_updater(params: CallParams) {
     info!("weather_updater starting");
     debug!("weather_updater parameters {:?}", params);
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::Client::new();
     let update_period = Duration::from_secs(10 * 60);
     loop {
         let url = format!(
@@ -72,11 +65,11 @@ pub fn weather_updater(params: CallParams) {
             params.base_url, params.lat, params.lon, params.units, params.api_key
         );
         debug!("Getting weather from {}", url);
-        let resp = client.get(url).send();
+        let resp = client.get(url).send().await;
         match resp {
             Ok(r) => {
                 debug!("GET weather: {:?}", r.status());
-                let w: OneCallWeather = r.json().unwrap_or_default();
+                let w: OneCallWeather = r.json().await.unwrap_or_default();
                 if w.current.utc_timestamp != 0 {
                     params
                         .tx
@@ -84,6 +77,7 @@ pub fn weather_updater(params: CallParams) {
                             feed: "weather.temp".into(),
                             value: w.current.temperature,
                         })
+                        .await
                         .unwrap();
                     params
                         .tx
@@ -91,6 +85,7 @@ pub fn weather_updater(params: CallParams) {
                             feed: "weather.humidity".into(),
                             value: w.current.humidity as f32,
                         })
+                        .await
                         .unwrap();
                     params
                         .tx
@@ -98,6 +93,7 @@ pub fn weather_updater(params: CallParams) {
                             feed: "weather.pressure".into(),
                             value: w.current.pressure as f32,
                         })
+                        .await
                         .unwrap();
                 }
             }

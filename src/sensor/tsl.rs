@@ -17,8 +17,8 @@
 use crate::adafruit;
 use embedded_hal::blocking::{delay, i2c};
 use log::{debug, error};
-use std::sync::mpsc;
 use std::time::{Duration, Instant};
+use tokio::sync::mpsc;
 use tsl2591::{Gain, IntegrationTimes};
 
 const UPDATE_PERIOD: Duration = Duration::from_secs(60);
@@ -70,45 +70,58 @@ pub fn poll<I2C, D, E>(
 
     let now = Instant::now();
     if now.duration_since(state.last_update) > UPDATE_PERIOD {
-        if state.count > 0 {
-            tx.send(adafruit::Metric {
-                feed: "mbr-tsl2591.lux".into(),
-                value: state.lux_sum / state.count as f32,
-            })
-            .unwrap();
-            tx.send(adafruit::Metric {
-                feed: "mbr-tsl2591.full-spectrum".into(),
-                value: state.full_spectrum_sum / state.count as f32,
-            })
-            .unwrap();
-            tx.send(adafruit::Metric {
-                feed: "mbr-tsl2591.infrared".into(),
-                value: state.infrared_sum / state.count as f32,
-            })
-            .unwrap();
-            tx.send(adafruit::Metric {
-                feed: "mbr-tsl2591.gain".into(),
-                value: gain_factor(state.gain) as f32,
-            })
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
             .unwrap();
 
-            tx.send(adafruit::Metric {
-                feed: "mbr.lux".into(),
-                value: state.lux_sum / state.count as f32,
-            })
-            .unwrap();
-            tx.send(adafruit::Metric {
-                feed: "mbr.lux-db".into(),
-                value: 10. * (state.lux_sum / state.count as f32).log10(),
-            })
-            .unwrap();
-        }
+        rt.block_on(async move {
+            if state.count > 0 {
+                tx.send(adafruit::Metric {
+                    feed: "mbr-tsl2591.lux".into(),
+                    value: state.lux_sum / state.count as f32,
+                })
+                .await
+                .unwrap();
+                tx.send(adafruit::Metric {
+                    feed: "mbr-tsl2591.full-spectrum".into(),
+                    value: state.full_spectrum_sum / state.count as f32,
+                })
+                .await
+                .unwrap();
+                tx.send(adafruit::Metric {
+                    feed: "mbr-tsl2591.infrared".into(),
+                    value: state.infrared_sum / state.count as f32,
+                })
+                .await
+                .unwrap();
+                tx.send(adafruit::Metric {
+                    feed: "mbr-tsl2591.gain".into(),
+                    value: gain_factor(state.gain) as f32,
+                })
+                .await
+                .unwrap();
 
-        state.lux_sum = 0.0;
-        state.full_spectrum_sum = 0.0;
-        state.infrared_sum = 0.0;
-        state.count = 0;
-        state.last_update = now;
+                tx.send(adafruit::Metric {
+                    feed: "mbr.lux".into(),
+                    value: state.lux_sum / state.count as f32,
+                })
+                .await
+                .unwrap();
+                tx.send(adafruit::Metric {
+                    feed: "mbr.lux-db".into(),
+                    value: 10. * (state.lux_sum / state.count as f32).log10(),
+                })
+                .await
+                .unwrap();
+            }
+
+            state.lux_sum = 0.0;
+            state.full_spectrum_sum = 0.0;
+            state.infrared_sum = 0.0;
+            state.count = 0;
+            state.last_update = now;
+        });
     }
 }
 

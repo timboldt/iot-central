@@ -19,8 +19,9 @@ use crate::adafruit;
 //use chrono::{offset::TimeZone, Local, Utc};
 use log::{debug, info};
 use serde::Deserialize;
-use std::sync::{mpsc, Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
+use tokio::sync::mpsc;
 
 #[derive(Debug)]
 pub struct CallParams {
@@ -37,10 +38,10 @@ struct Quote {
     current_price: f32,
 }
 
-pub fn finance_updater(params: CallParams) {
+pub async fn finance_updater(params: CallParams) {
     info!("finance_updater starting");
     debug!("finance_updater parameters {:?}", params);
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::Client::new();
     let update_period = Duration::from_secs(10 * 60);
     loop {
         for symbol in &params.symbols {
@@ -49,11 +50,12 @@ pub fn finance_updater(params: CallParams) {
             let resp = client
                 .get(url)
                 .header("X-Finnhub-Token", &params.api_key)
-                .send();
+                .send()
+                .await;
             match resp {
                 Ok(r) => {
                     debug!("GET finance (symbol: {}): {:?}", symbol, r.status());
-                    let q: Quote = r.json().unwrap_or_default();
+                    let q: Quote = r.json().await.unwrap_or_default();
                     if q.current_price != 0.0 {
                         params
                             .tx
@@ -64,7 +66,8 @@ pub fn finance_updater(params: CallParams) {
                                 ),
                                 value: q.current_price,
                             })
-                            .unwrap();
+                            .await
+                            .unwrap()
                     }
                 }
                 _ => {

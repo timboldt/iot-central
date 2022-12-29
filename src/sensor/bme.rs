@@ -15,12 +15,12 @@
 #![warn(clippy::all)]
 
 use crate::adafruit;
-use bme280::BME280;
 use crate::conversion;
+use bme280::BME280;
 use embedded_hal::blocking::{delay, i2c};
 use log::debug;
-use std::sync::mpsc;
 use std::time::{Duration, Instant};
+use tokio::sync::mpsc;
 
 const UPDATE_PERIOD: Duration = Duration::from_secs(60);
 
@@ -54,62 +54,75 @@ pub fn poll<I2C, D, E>(
     }
 
     let now = Instant::now();
-    if now.duration_since(state.last_update) > UPDATE_PERIOD {
-        if state.count > 0 {
-            let celsius = state.temperature_sum / state.count as f32;
-            let relative_humidity = state.humidity_sum / state.count as f32;
-            let raw_pressure_hpa = state.pressure_sum / state.count as f32 / 100.0;
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
 
-            tx.send(adafruit::Metric {
-                feed: "mbr-bme280.temperature".into(),
-                value: celsius,
-            })
-            .unwrap();
-            tx.send(adafruit::Metric {
-                feed: "mbr-bme280.humidity".into(),
-                value: relative_humidity,
-            })
-            .unwrap();
-            tx.send(adafruit::Metric {
-                feed: "mbr-bme280.pressure".into(),
-                value: raw_pressure_hpa,
-            })
-            .unwrap();
+    rt.block_on(async move {
+        if now.duration_since(state.last_update) > UPDATE_PERIOD {
+            if state.count > 0 {
+                let celsius = state.temperature_sum / state.count as f32;
+                let relative_humidity = state.humidity_sum / state.count as f32;
+                let raw_pressure_hpa = state.pressure_sum / state.count as f32 / 100.0;
 
-            let fahrenheit = conversion::celsius_to_fahrenheit(celsius);
-            state.last_abs_humidity =
-                conversion::relative_humidity_to_absolute(relative_humidity, celsius);
-            let sealevel_pressure = conversion::hpa_to_inhg(conversion::raw_pressure_to_sealevel(
-                raw_pressure_hpa,
-                celsius,
-            ));
+                tx.send(adafruit::Metric {
+                    feed: "mbr-bme280.temperature".into(),
+                    value: celsius,
+                })
+                .await
+                .unwrap();
+                tx.send(adafruit::Metric {
+                    feed: "mbr-bme280.humidity".into(),
+                    value: relative_humidity,
+                })
+                .await
+                .unwrap();
+                tx.send(adafruit::Metric {
+                    feed: "mbr-bme280.pressure".into(),
+                    value: raw_pressure_hpa,
+                })
+                .await
+                .unwrap();
 
-            tx.send(adafruit::Metric {
-                feed: "mbr.temperature".into(),
-                value: fahrenheit,
-            })
-            .unwrap();
-            tx.send(adafruit::Metric {
-                feed: "mbr.humidity".into(),
-                value: relative_humidity,
-            })
-            .unwrap();
-            tx.send(adafruit::Metric {
-                feed: "mbr.abs-humidity".into(),
-                value: state.last_abs_humidity,
-            })
-            .unwrap();
-            tx.send(adafruit::Metric {
-                feed: "mbr.pressure".into(),
-                value: sealevel_pressure,
-            })
-            .unwrap();
+                let fahrenheit = conversion::celsius_to_fahrenheit(celsius);
+                state.last_abs_humidity =
+                    conversion::relative_humidity_to_absolute(relative_humidity, celsius);
+                let sealevel_pressure = conversion::hpa_to_inhg(
+                    conversion::raw_pressure_to_sealevel(raw_pressure_hpa, celsius),
+                );
+
+                tx.send(adafruit::Metric {
+                    feed: "mbr.temperature".into(),
+                    value: fahrenheit,
+                })
+                .await
+                .unwrap();
+                tx.send(adafruit::Metric {
+                    feed: "mbr.humidity".into(),
+                    value: relative_humidity,
+                })
+                .await
+                .unwrap();
+                tx.send(adafruit::Metric {
+                    feed: "mbr.abs-humidity".into(),
+                    value: state.last_abs_humidity,
+                })
+                .await
+                .unwrap();
+                tx.send(adafruit::Metric {
+                    feed: "mbr.pressure".into(),
+                    value: sealevel_pressure,
+                })
+                .await
+                .unwrap();
+            }
+
+            state.temperature_sum = 0.0;
+            state.humidity_sum = 0.0;
+            state.pressure_sum = 0.0;
+            state.count = 0;
+            state.last_update = now;
         }
-
-        state.temperature_sum = 0.0;
-        state.humidity_sum = 0.0;
-        state.pressure_sum = 0.0;
-        state.count = 0;
-        state.last_update = now;
-    }
+    });
 }

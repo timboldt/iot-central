@@ -17,6 +17,7 @@ bme280 = "0.2.1"
 tsl2591 = "0.2.0"
 shared-bus = "0.2.4"
 embedded-hal = "0.2.7"
+tokio = { version = "1.23.0", features = ["full"] }
 
 [dependencies.ftdi]
 version = "0.1.3"

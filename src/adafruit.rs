@@ -15,7 +15,7 @@
 #![warn(clippy::all)]
 
 use log::{debug, info};
-use std::sync::mpsc;
+use tokio::sync::mpsc;
 
 #[derive(Debug)]
 pub struct CallParams {
@@ -30,23 +30,24 @@ pub struct Metric {
     pub value: f32,
 }
 
-pub fn aio_sender(params: CallParams, rx: mpsc::Receiver<Metric>) {
+pub async fn aio_sender(params: CallParams, mut rx: mpsc::Receiver<Metric>) {
     info!("aio_sender starting");
     debug!("aio_sender parameters {:?}", params);
-    let client = reqwest::blocking::Client::new();
-    while let Ok(m) = rx.recv() {
+    let client = reqwest::Client::new();
+    while let Some(m) = rx.recv().await {
         debug!("Received {:?}", m);
         let url = format!(
             "{}/{}/feeds/{}/data",
             params.base_url, params.io_user, m.feed
         );
         debug!("POSTing to {}", url);
-        let form = reqwest::blocking::multipart::Form::new().text("value", m.value.to_string());
+        let form = reqwest::multipart::Form::new().text("value", m.value.to_string());
         let resp = client
             .post(url)
             .header("X-AIO-Key", params.io_key.as_bytes())
             .multipart(form)
-            .send();
+            .send()
+            .await;
         match resp {
             Ok(r) => {
                 debug!("POST succeeded: {:?}", r.status());
