@@ -17,8 +17,8 @@
 use crate::adafruit;
 use embedded_hal::blocking::{delay, i2c};
 use log::{debug, error};
+use smol;
 use std::time::{Duration, Instant};
-use tokio::sync::mpsc;
 use tsl2591::{Gain, IntegrationTimes};
 
 const UPDATE_PERIOD: Duration = Duration::from_secs(60);
@@ -41,7 +41,7 @@ where
 pub fn poll<I2C, D, E>(
     tsl: &mut tsl2591::Driver<I2C>,
     state: &mut State<D>,
-    tx: &mpsc::Sender<adafruit::Metric>,
+    tx: &async_channel::Sender<adafruit::Metric>,
 ) where
     I2C: i2c::Read<Error = E> + i2c::Write<Error = E> + i2c::WriteRead<Error = E>,
     D: delay::DelayUs<u8> + delay::DelayMs<u8>,
@@ -70,12 +70,7 @@ pub fn poll<I2C, D, E>(
 
     let now = Instant::now();
     if now.duration_since(state.last_update) > UPDATE_PERIOD {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-
-        rt.block_on(async move {
+        smol::block_on(async move {
             if state.count > 0 {
                 tx.send(adafruit::Metric {
                     feed: "mbr-tsl2591.lux".into(),

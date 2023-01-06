@@ -14,8 +14,8 @@
 
 #![warn(clippy::all)]
 
+use async_channel;
 use log::{debug, info};
-use tokio::sync::mpsc;
 
 #[derive(Debug)]
 pub struct CallParams {
@@ -30,11 +30,11 @@ pub struct Metric {
     pub value: f32,
 }
 
-pub async fn aio_sender(params: CallParams, mut rx: mpsc::Receiver<Metric>) {
+pub async fn aio_sender(params: CallParams, rx: async_channel::Receiver<Metric>) {
     info!("aio_sender starting");
     debug!("aio_sender parameters {:?}", params);
     let client = reqwest::Client::new();
-    while let Some(m) = rx.recv().await {
+    while let Ok(m) = rx.recv().await {
         debug!("Received {:?}", m);
         let url = format!(
             "{}/{}/feeds/{}/data",

@@ -24,17 +24,16 @@ mod finance;
 mod sensor;
 mod weather;
 
+use async_channel;
 use log::info;
 use std::env;
 use std::sync::{Arc, Condvar, Mutex};
-use tokio::sync::mpsc::channel;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
     let shutdown = Arc::new((Mutex::new(false), Condvar::new()));
-    let (tx, rx) = channel(32);
+    let (tx, rx) = async_channel::bounded(32);
 
     // Start the Adafruit IO transmission agent.
     let aio_params = adafruit::CallParams {
@@ -42,14 +41,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         io_user: env::var("IO_USERNAME").expect("Adafruit IO_USERNAME is not defined."),
         io_key: env::var("IO_KEY").expect("Adafruit IO_KEY is not defined."),
     };
-    let aio_thread = tokio::spawn(async move { adafruit::aio_sender(aio_params, rx).await });
+    let aio_thread = smol::spawn(async move { adafruit::aio_sender(aio_params, rx).await });
 
     // Start the sensor thread.
     let sensor_params = sensor::CallParams {
         shutdown: shutdown.clone(),
         tx: tx.clone(),
     };
-    let sensor_thread = tokio::spawn(async move { sensor::sensor_updater(sensor_params).await });
+    let sensor_thread = smol::spawn(async move { sensor::sensor_updater(sensor_params).await });
 
     // Start the finance thread.
     let finance_params = finance::CallParams {
@@ -65,8 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "QQQ".into(),
         ],
     };
-    let finance_thread =
-        tokio::spawn(async move { finance::finance_updater(finance_params).await });
+    let finance_thread = smol::spawn(async move { finance::finance_updater(finance_params).await });
 
     // Start the weather thread.
     let weather_params = weather::CallParams {
@@ -78,8 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         lon: env::var("OPEN_WEATHER_LON").expect("OPEN_WEATHER_LON is not defined."),
         units: "metric".to_owned(),
     };
-    let weather_thread =
-        tokio::spawn(async move { weather::weather_updater(weather_params).await });
+    let weather_thread = smol::spawn(async move { weather::weather_updater(weather_params).await });
 
     ctrlc::set_handler(move || {
         info!("Shutdown initiated...");
@@ -92,23 +89,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     })
     .unwrap();
 
-    info!("Waiting for Sensor thread...");
-    sensor_thread.await.expect("Failed to join sensor_thread.");
+    smol::block_on(async {
+        info!("Waiting for Sensor thread...");
+        sensor_thread.await;
 
-    info!("Waiting for Finance thread...");
-    finance_thread
-        .await
-        .expect("Failed to join finance_thread.");
+        info!("Waiting for Finance thread...");
+        finance_thread.await;
 
-    info!("Waiting for Weather thread...");
-    weather_thread
-        .await
-        .expect("Failed to join weather_thread.");
+        info!("Waiting for Weather thread...");
+        weather_thread.await;
 
-    // Signal the consumer thread (Adafruit IO sender).
-    drop(tx);
-    info!("Waiting for Adafruit IO thread...");
-    aio_thread.await.expect("Failed to join aio_thread.");
+        // Signal the consumer thread (Adafruit IO sender).
+        drop(tx);
+        info!("Waiting for Adafruit IO thread...");
+        aio_thread.await;
+    });
 
     Ok(())
 }

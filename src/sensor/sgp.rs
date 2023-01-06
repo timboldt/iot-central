@@ -15,11 +15,11 @@
 #![warn(clippy::all)]
 
 use crate::adafruit;
+use async_channel;
 use embedded_hal::blocking::{delay, i2c};
 use log::debug;
 use sgp30::Sgp30;
 use std::time::{Duration, Instant};
-use tokio::sync::mpsc;
 
 const UPDATE_PERIOD: Duration = Duration::from_secs(60);
 
@@ -39,7 +39,7 @@ pub struct State {
 pub fn poll<I2C, D, E>(
     sgp: &mut Sgp30<I2C, D>,
     state: &mut State,
-    tx: &mpsc::Sender<adafruit::Metric>,
+    tx: &async_channel::Sender<adafruit::Metric>,
 ) where
     I2C: i2c::Read<Error = E> + i2c::Write<Error = E> + i2c::WriteRead<Error = E>,
     D: delay::DelayUs<u16> + delay::DelayMs<u16>,
@@ -73,12 +73,7 @@ pub fn poll<I2C, D, E>(
 
     let now = Instant::now();
     if now.duration_since(state.last_update) > UPDATE_PERIOD {
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .unwrap();
-
-        rt.block_on(async move {
+        smol::block_on(async move {
             if state.co2_count > 0 {
                 tx.send(adafruit::Metric {
                     feed: "mbr-sgp30.co2".into(),

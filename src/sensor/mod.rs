@@ -25,6 +25,7 @@ mod sgp;
 mod tsl;
 
 use crate::adafruit;
+use async_channel;
 use bme280::BME280;
 #[cfg(feature = "ftdi")]
 use ftdi_embedded_hal as hal;
@@ -34,7 +35,6 @@ use log::{debug, error, info};
 use sgp30::Sgp30;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
-use tokio::sync::mpsc;
 
 const DEFAULT_ABS_HUMIDITY: f32 = 10.5;
 const SENSOR_PERIOD: Duration = Duration::from_millis(1000);
@@ -42,7 +42,7 @@ const SENSOR_PERIOD: Duration = Duration::from_millis(1000);
 #[derive(Debug)]
 pub struct CallParams {
     pub shutdown: Arc<(Mutex<bool>, Condvar)>,
-    pub tx: mpsc::Sender<adafruit::Metric>,
+    pub tx: async_channel::Sender<adafruit::Metric>,
 }
 
 pub async fn sensor_updater(params: CallParams) {

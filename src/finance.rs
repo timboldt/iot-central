@@ -17,16 +17,16 @@
 use crate::adafruit;
 
 //use chrono::{offset::TimeZone, Local, Utc};
+use async_channel;
 use log::{debug, info};
 use serde::Deserialize;
 use std::sync::{Arc, Condvar, Mutex};
 use std::time::Duration;
-use tokio::sync::mpsc;
 
 #[derive(Debug)]
 pub struct CallParams {
     pub shutdown: Arc<(Mutex<bool>, Condvar)>,
-    pub tx: mpsc::Sender<adafruit::Metric>,
+    pub tx: async_channel::Sender<adafruit::Metric>,
     pub base_url: String,
     pub api_key: String,
     pub symbols: Vec<String>,

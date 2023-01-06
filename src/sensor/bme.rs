@@ -16,11 +16,12 @@
 
 use crate::adafruit;
 use crate::conversion;
+use async_channel;
 use bme280::BME280;
 use embedded_hal::blocking::{delay, i2c};
 use log::debug;
+use smol;
 use std::time::{Duration, Instant};
-use tokio::sync::mpsc;
 
 const UPDATE_PERIOD: Duration = Duration::from_secs(60);
 
@@ -37,7 +38,7 @@ pub struct State {
 pub fn poll<I2C, D, E>(
     bme: &mut BME280<I2C, D>,
     state: &mut State,
-    tx: &mpsc::Sender<adafruit::Metric>,
+    tx: &async_channel::Sender<adafruit::Metric>,
 ) where
     I2C: i2c::Read<Error = E> + i2c::Write<Error = E> + i2c::WriteRead<Error = E>,
     D: delay::DelayUs<u8> + delay::DelayMs<u8>,
@@ -54,12 +55,8 @@ pub fn poll<I2C, D, E>(
     }
 
     let now = Instant::now();
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
 
-    rt.block_on(async move {
+    smol::block_on(async move {
         if now.duration_since(state.last_update) > UPDATE_PERIOD {
             if state.count > 0 {
                 let celsius = state.temperature_sum / state.count as f32;
