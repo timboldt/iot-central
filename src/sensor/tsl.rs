@@ -17,7 +17,6 @@
 use crate::adafruit;
 use embedded_hal::blocking::{delay, i2c};
 use log::{debug, error};
-use smol;
 use std::time::{Duration, Instant};
 use tsl2591::{Gain, IntegrationTimes};
 
@@ -130,9 +129,6 @@ where
     if ch_0 == 0xFFFF || ch_1 == 0xFFFF {
         // Lower the gain if we are clipping.
         state.gain = next_gain_down(state.gain);
-    } else if ch_0 == 0 || ch_1 == 0 {
-        // Raise the gain if we have no signal.
-        state.gain = next_gain_up(state.gain);
     } else if ch_0 < MIN_THRESHOLD && ch_1 < MIN_THRESHOLD {
         // Raise the gain to get more resolution.
         state.gain = next_gain_up(state.gain);

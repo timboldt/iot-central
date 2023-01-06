@@ -16,8 +16,6 @@
 
 use crate::adafruit;
 
-//use chrono::{offset::TimeZone, Local, Utc};
-use async_channel;
 use log::{debug, info};
 use serde::Deserialize;
 use std::sync::{Arc, Condvar, Mutex};

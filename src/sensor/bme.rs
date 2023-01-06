@@ -16,11 +16,9 @@
 
 use crate::adafruit;
 use crate::conversion;
-use async_channel;
 use bme280::BME280;
 use embedded_hal::blocking::{delay, i2c};
 use log::debug;
-use smol;
 use std::time::{Duration, Instant};
 
 const UPDATE_PERIOD: Duration = Duration::from_secs(60);

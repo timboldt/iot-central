@@ -14,7 +14,6 @@
 
 #![warn(clippy::all)]
 
-use async_channel;
 use log::{debug, info};
 
 #[derive(Debug)]

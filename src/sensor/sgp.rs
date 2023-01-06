@@ -15,7 +15,6 @@
 #![warn(clippy::all)]
 
 use crate::adafruit;
-use async_channel;
 use embedded_hal::blocking::{delay, i2c};
 use log::debug;
 use sgp30::Sgp30;

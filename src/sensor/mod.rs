@@ -25,7 +25,6 @@ mod sgp;
 mod tsl;
 
 use crate::adafruit;
-use async_channel;
 use bme280::BME280;
 #[cfg(feature = "ftdi")]
 use ftdi_embedded_hal as hal;

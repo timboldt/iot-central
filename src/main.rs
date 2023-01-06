@@ -24,7 +24,6 @@ mod finance;
 mod sensor;
 mod weather;
 
-use async_channel;
 use log::info;
 use std::env;
 use std::sync::{Arc, Condvar, Mutex};
