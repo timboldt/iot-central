@@ -17,7 +17,6 @@
 use crate::adafruit;
 use embedded_hal::blocking::{delay, i2c};
 use log::{debug, error};
-use std::sync::mpsc;
 use std::time::{Duration, Instant};
 use tsl2591::{Gain, IntegrationTimes};
 
@@ -41,7 +40,7 @@ where
 pub fn poll<I2C, D, E>(
     tsl: &mut tsl2591::Driver<I2C>,
     state: &mut State<D>,
-    tx: &mpsc::Sender<adafruit::Metric>,
+    tx: &async_channel::Sender<adafruit::Metric>,
 ) where
     I2C: i2c::Read<Error = E> + i2c::Write<Error = E> + i2c::WriteRead<Error = E>,
     D: delay::DelayUs<u8> + delay::DelayMs<u8>,
@@ -70,45 +69,53 @@ pub fn poll<I2C, D, E>(
 
     let now = Instant::now();
     if now.duration_since(state.last_update) > UPDATE_PERIOD {
-        if state.count > 0 {
-            tx.send(adafruit::Metric {
-                feed: "mbr-tsl2591.lux".into(),
-                value: state.lux_sum / state.count as f32,
-            })
-            .unwrap();
-            tx.send(adafruit::Metric {
-                feed: "mbr-tsl2591.full-spectrum".into(),
-                value: state.full_spectrum_sum / state.count as f32,
-            })
-            .unwrap();
-            tx.send(adafruit::Metric {
-                feed: "mbr-tsl2591.infrared".into(),
-                value: state.infrared_sum / state.count as f32,
-            })
-            .unwrap();
-            tx.send(adafruit::Metric {
-                feed: "mbr-tsl2591.gain".into(),
-                value: gain_factor(state.gain) as f32,
-            })
-            .unwrap();
+        smol::block_on(async move {
+            if state.count > 0 {
+                tx.send(adafruit::Metric {
+                    feed: "mbr-tsl2591.lux".into(),
+                    value: state.lux_sum / state.count as f32,
+                })
+                .await
+                .unwrap();
+                tx.send(adafruit::Metric {
+                    feed: "mbr-tsl2591.full-spectrum".into(),
+                    value: state.full_spectrum_sum / state.count as f32,
+                })
+                .await
+                .unwrap();
+                tx.send(adafruit::Metric {
+                    feed: "mbr-tsl2591.infrared".into(),
+                    value: state.infrared_sum / state.count as f32,
+                })
+                .await
+                .unwrap();
+                tx.send(adafruit::Metric {
+                    feed: "mbr-tsl2591.gain".into(),
+                    value: gain_factor(state.gain) as f32,
+                })
+                .await
+                .unwrap();
 
-            tx.send(adafruit::Metric {
-                feed: "mbr.lux".into(),
-                value: state.lux_sum / state.count as f32,
-            })
-            .unwrap();
-            tx.send(adafruit::Metric {
-                feed: "mbr.lux-db".into(),
-                value: 10. * (state.lux_sum / state.count as f32).log10(),
-            })
-            .unwrap();
-        }
+                tx.send(adafruit::Metric {
+                    feed: "mbr.lux".into(),
+                    value: state.lux_sum / state.count as f32,
+                })
+                .await
+                .unwrap();
+                tx.send(adafruit::Metric {
+                    feed: "mbr.lux-db".into(),
+                    value: 10. * (state.lux_sum / state.count as f32).log10(),
+                })
+                .await
+                .unwrap();
+            }
 
-        state.lux_sum = 0.0;
-        state.full_spectrum_sum = 0.0;
-        state.infrared_sum = 0.0;
-        state.count = 0;
-        state.last_update = now;
+            state.lux_sum = 0.0;
+            state.full_spectrum_sum = 0.0;
+            state.infrared_sum = 0.0;
+            state.count = 0;
+            state.last_update = now;
+        });
     }
 }
 
@@ -122,9 +129,6 @@ where
     if ch_0 == 0xFFFF || ch_1 == 0xFFFF {
         // Lower the gain if we are clipping.
         state.gain = next_gain_down(state.gain);
-    } else if ch_0 == 0 || ch_1 == 0 {
-        // Raise the gain if we have no signal.
-        state.gain = next_gain_up(state.gain);
     } else if ch_0 < MIN_THRESHOLD && ch_1 < MIN_THRESHOLD {
         // Raise the gain to get more resolution.
         state.gain = next_gain_up(state.gain);

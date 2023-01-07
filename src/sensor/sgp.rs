@@ -18,7 +18,6 @@ use crate::adafruit;
 use embedded_hal::blocking::{delay, i2c};
 use log::debug;
 use sgp30::Sgp30;
-use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 const UPDATE_PERIOD: Duration = Duration::from_secs(60);
@@ -39,7 +38,7 @@ pub struct State {
 pub fn poll<I2C, D, E>(
     sgp: &mut Sgp30<I2C, D>,
     state: &mut State,
-    tx: &mpsc::Sender<adafruit::Metric>,
+    tx: &async_channel::Sender<adafruit::Metric>,
 ) where
     I2C: i2c::Read<Error = E> + i2c::Write<Error = E> + i2c::WriteRead<Error = E>,
     D: delay::DelayUs<u16> + delay::DelayMs<u16>,
@@ -73,42 +72,48 @@ pub fn poll<I2C, D, E>(
 
     let now = Instant::now();
     if now.duration_since(state.last_update) > UPDATE_PERIOD {
-        if state.co2_count > 0 {
-            tx.send(adafruit::Metric {
-                feed: "mbr-sgp30.co2".into(),
-                value: state.co2_sum / state.co2_count as f32,
-            })
-            .unwrap();
-        }
+        smol::block_on(async move {
+            if state.co2_count > 0 {
+                tx.send(adafruit::Metric {
+                    feed: "mbr-sgp30.co2".into(),
+                    value: state.co2_sum / state.co2_count as f32,
+                })
+                .await
+                .unwrap();
+            }
 
-        if state.tvoc_count > 0 {
-            tx.send(adafruit::Metric {
-                feed: "mbr-sgp30.tvoc".into(),
-                value: state.tvoc_sum / state.tvoc_count as f32,
-            })
-            .unwrap();
-        }
+            if state.tvoc_count > 0 {
+                tx.send(adafruit::Metric {
+                    feed: "mbr-sgp30.tvoc".into(),
+                    value: state.tvoc_sum / state.tvoc_count as f32,
+                })
+                .await
+                .unwrap();
+            }
 
-        if state.raw_count > 0 {
-            tx.send(adafruit::Metric {
-                feed: "mbr-sgp30.raw-h2".into(),
-                value: state.raw_h2_sum / state.raw_count as f32,
-            })
-            .unwrap();
-            tx.send(adafruit::Metric {
-                feed: "mbr-sgp30.raw-ethanol".into(),
-                value: state.raw_ethanol_sum / state.raw_count as f32,
-            })
-            .unwrap();
-        }
+            if state.raw_count > 0 {
+                tx.send(adafruit::Metric {
+                    feed: "mbr-sgp30.raw-h2".into(),
+                    value: state.raw_h2_sum / state.raw_count as f32,
+                })
+                .await
+                .unwrap();
+                tx.send(adafruit::Metric {
+                    feed: "mbr-sgp30.raw-ethanol".into(),
+                    value: state.raw_ethanol_sum / state.raw_count as f32,
+                })
+                .await
+                .unwrap();
+            }
 
-        state.co2_sum = 0.0;
-        state.co2_count = 0;
-        state.tvoc_sum = 0.0;
-        state.tvoc_count = 0;
-        state.last_update = now;
-        state.raw_h2_sum = 0.0;
-        state.raw_ethanol_sum = 0.0;
-        state.raw_count = 0;
+            state.co2_sum = 0.0;
+            state.co2_count = 0;
+            state.tvoc_sum = 0.0;
+            state.tvoc_count = 0;
+            state.last_update = now;
+            state.raw_h2_sum = 0.0;
+            state.raw_ethanol_sum = 0.0;
+            state.raw_count = 0;
+        });
     }
 }

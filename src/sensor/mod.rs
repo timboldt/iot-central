@@ -32,7 +32,7 @@ use ftdi_embedded_hal as hal;
 use linux_embedded_hal as hal;
 use log::{debug, error, info};
 use sgp30::Sgp30;
-use std::sync::{mpsc, Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 const DEFAULT_ABS_HUMIDITY: f32 = 10.5;
@@ -41,10 +41,10 @@ const SENSOR_PERIOD: Duration = Duration::from_millis(1000);
 #[derive(Debug)]
 pub struct CallParams {
     pub shutdown: Arc<(Mutex<bool>, Condvar)>,
-    pub tx: mpsc::Sender<adafruit::Metric>,
+    pub tx: async_channel::Sender<adafruit::Metric>,
 }
 
-pub fn sensor_updater(params: CallParams) {
+pub async fn sensor_updater(params: CallParams) {
     info!("sensor_updater starting");
     debug!("sensor_updater parameters {:?}", params);
 
@@ -125,7 +125,11 @@ pub fn sensor_updater(params: CallParams) {
         infrared_sum: 0.0,
         count: 0,
     };
-    let mut tsl = match tsl2591::Driver::new_define_integration(i2c.acquire_i2c(), tsl_state.integ_time, tsl_state.gain) {
+    let mut tsl = match tsl2591::Driver::new_define_integration(
+        i2c.acquire_i2c(),
+        tsl_state.integ_time,
+        tsl_state.gain,
+    ) {
         Ok(mut t) => {
             match t.enable() {
                 Ok(()) => {}

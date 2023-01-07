@@ -65,22 +65,10 @@ mod tests {
 
     #[test]
     fn rp_to_s_works() {
-        assert_eq!(
-            1_012.0,
-            raw_pressure_to_sealevel(1000.0, 15.0).round()
-        );
-        assert_eq!(
-            1_025.0,
-            raw_pressure_to_sealevel(1_013.25, 15.0).round()
-        );
-        assert_eq!(
-            1_010.0,
-            raw_pressure_to_sealevel(999.0, 40.0).round()
-        );
-        assert_eq!(
-            1_010.0,
-            raw_pressure_to_sealevel(999.0, 40.0).round()
-        );
+        assert_eq!(1_012.0, raw_pressure_to_sealevel(1000.0, 15.0).round());
+        assert_eq!(1_025.0, raw_pressure_to_sealevel(1_013.25, 15.0).round());
+        assert_eq!(1_010.0, raw_pressure_to_sealevel(999.0, 40.0).round());
+        assert_eq!(1_010.0, raw_pressure_to_sealevel(999.0, 40.0).round());
     }
 
     #[test]
