@@ -10,7 +10,7 @@ class Message:
 
 
 class Sender:
-    def __init__(self, base_url: str, io_user: str, io_key: str) -> None:
+    def __init__(self, io_user: str, io_key: str) -> None:
         QUEUE_SIZE = 8
         self._queue = asyncio.Queue(QUEUE_SIZE)
         self._io_user = io_user
@@ -24,11 +24,12 @@ class Sender:
 
     async def run(self) -> None:
         aio = Client(self._io_user, self._io_key)
+        print("Adafruit IO Sender started")
         while True:
             try:
                 msg = await self._queue.get()
             except asyncio.exceptions.CancelledError:
-                print("Adafruit IO sender was cancelled")
+                print("Adafruit IO Sender stopped")
                 return
             aio.send_data(msg.feed, msg.value)
             print("Adafruit IO sender sent: {}/{}".format(msg.feed, msg.value))
