@@ -1,13 +1,13 @@
+"""Uploads sensor telemetry and web API data to Adafruit IO"""
 import asyncio
 import os
-import random
-import time
 
 import adafruit
 import weather
 
 
 async def main():
+    """Uploads sensor telemetry and web API data to Adafruit IO"""
     sender = adafruit.Sender(os.getenv("IO_USERNAME"),
                              os.getenv("IO_KEY"))
 
