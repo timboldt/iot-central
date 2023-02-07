@@ -17,7 +17,7 @@ class Fetcher:
             while True:
                 res = self._fetch()
                 if res is not None:
-                    await self._send()
+                    await self._send(res)
                 await asyncio.sleep(self.UPDATE_PERIOD)
         except asyncio.exceptions.CancelledError:
             print("Weather Fetcher stopped")
@@ -32,6 +32,7 @@ class Fetcher:
             return None
         print("Weather is:", res.current.temperature("celsius"),
             res.current.humidity, res.current.barometric_pressure("hPa"))
+        return res
 
     async def _send(self, res: object):
         try:
