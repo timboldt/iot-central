@@ -1,10 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
-	"github.com/timboldt/iot-central/finance"
+	"github.com/timboldt/iot-central/adafruitio"
 )
 
 // func parseFloatOrDefault(s string) float64 {
@@ -27,12 +26,17 @@ func main() {
 	// 	fmt.Println(w)
 	// }
 
-	quote, err := finance.Get(finance.Params{
-		APIKey: os.Getenv("FINHUB_API_KEY"),
+	// quote, err := finance.Get(finance.Params{
+	// 	APIKey: os.Getenv("FINHUB_API_KEY"),
+	// })
+	// if err != nil {
+	// 	fmt.Printf("Failed to get finance info: %v\n", err)
+	// } else {
+	// 	fmt.Printf("%+v\n", quote)
+	// }
+
+	adafruitio.Send(adafruitio.Params{
+		Username: os.Getenv("IO_USERNAME"),
+		Key:      os.Getenv("IO_KEY"),
 	})
-	if err != nil {
-		fmt.Printf("Failed to get finance info: %v\n", err)
-	} else {
-		fmt.Printf("%+v\n", quote)
-	}
 }
