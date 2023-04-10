@@ -30,6 +30,9 @@ use std::sync::mpsc::channel;
 use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 
+const ENABLE_FINANCE_THREAD: bool = false;
+const ENABLE_WEATHER_THREAD: bool = false;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     env_logger::init();
 
@@ -51,33 +54,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let sensor_thread = thread::spawn(move || sensor::sensor_updater(sensor_params));
 
-    // Start the finance thread.
-    let finance_params = finance::CallParams {
-        shutdown: shutdown.clone(),
-        tx: tx.clone(),
-        base_url: "https://finnhub.io/api/v1/quote".to_owned(),
-        api_key: env::var("FINHUB_API_KEY").expect("FINHUB_API_KEY is not defined."),
-        symbols: vec![
-            "DIA".into(),
-            "COINBASE:BTC-USD".into(),
-            "BITFINEX:USTUSD".into(),
-            "KRAKEN:USDTZUSD".into(),
-            "QQQ".into(),
-        ],
+    let finance_thread = if ENABLE_FINANCE_THREAD {
+        // Start the finance thread.
+        let finance_params = finance::CallParams {
+            shutdown: shutdown.clone(),
+            tx: tx.clone(),
+            base_url: "https://finnhub.io/api/v1/quote".to_owned(),
+            api_key: env::var("FINHUB_API_KEY").expect("FINHUB_API_KEY is not defined."),
+            symbols: vec![
+                "DIA".into(),
+                "COINBASE:BTC-USD".into(),
+                "BITFINEX:USTUSD".into(),
+                "KRAKEN:USDTZUSD".into(),
+                "QQQ".into(),
+            ],
+        };
+        thread::spawn(move || finance::finance_updater(finance_params))
+    } else {
+        // Do nothing.
+        thread::spawn(move || return)
     };
-    let finance_thread = thread::spawn(move || finance::finance_updater(finance_params));
 
-    // Start the weather thread.
-    let weather_params = weather::CallParams {
-        shutdown: shutdown.clone(),
-        tx: tx.clone(),
-        base_url: "https://api.openweathermap.org/data/2.5/onecall".to_owned(),
-        api_key: env::var("OPEN_WEATHER_KEY").expect("OPEN_WEATHER_KEY is not defined."),
-        lat: env::var("OPEN_WEATHER_LAT").expect("OPEN_WEATHER_LAT is not defined."),
-        lon: env::var("OPEN_WEATHER_LON").expect("OPEN_WEATHER_LON is not defined."),
-        units: "metric".to_owned(),
+    let weather_thread = if ENABLE_WEATHER_THREAD {
+        // Start the weather thread.
+        let weather_params = weather::CallParams {
+            shutdown: shutdown.clone(),
+            tx: tx.clone(),
+            base_url: "https://api.openweathermap.org/data/2.5/onecall".to_owned(),
+            api_key: env::var("OPEN_WEATHER_KEY").expect("OPEN_WEATHER_KEY is not defined."),
+            lat: env::var("OPEN_WEATHER_LAT").expect("OPEN_WEATHER_LAT is not defined."),
+            lon: env::var("OPEN_WEATHER_LON").expect("OPEN_WEATHER_LON is not defined."),
+            units: "metric".to_owned(),
+        };
+        thread::spawn(move || weather::weather_updater(weather_params))
+    } else {
+        // Do nothing.
+        thread::spawn(move || return)
     };
-    let weather_thread = thread::spawn(move || weather::weather_updater(weather_params));
 
     ctrlc::set_handler(move || {
         info!("Shutdown initiated...");
