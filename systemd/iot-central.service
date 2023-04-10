@@ -1,0 +1,12 @@
+[Unit]
+Description=IOT Central
+After=multi-user.target
+
+[Service]
+ExecStart=/home/pi/bin/iot-central
+Restart=always
+RestartSec=60
+EnvironmentFile=/home/pi/bin/env.txt
+
+[Install]
+WantedBy=multi-user.target
