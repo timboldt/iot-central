@@ -2,6 +2,7 @@ package weather
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -21,12 +22,12 @@ type Params struct {
 func Fetcher(params Params) {
 	ticker := time.NewTicker(10 * time.Minute)
 
-	fmt.Println("OpenWeather fetcher starting...")
+	log.Println("OpenWeather fetcher starting...")
 	processWeather(&params)
 	for {
 		select {
 		case <-params.DoneChan:
-			fmt.Println("OpenWeather fetcher shutting down...")
+			log.Println("OpenWeather fetcher shutting down...")
 			ticker.Stop()
 			params.WG.Done()
 			return
@@ -37,9 +38,9 @@ func Fetcher(params Params) {
 }
 
 func processWeather(params *Params) {
-	w, err := owm.NewOneCall("C", "EN", params.APIKey, []string{owm.ExcludeDaily, owm.ExcludeMinutely})
+	w, err := owm.NewOneCall("F", "EN", params.APIKey, []string{owm.ExcludeDaily, owm.ExcludeMinutely})
 	if err != nil {
-		fmt.Printf("Error setting up OpenWeather OneCall config: %v", err)
+		log.Printf("Error setting up OpenWeather OneCall config: %v", err)
 		return
 	}
 
@@ -50,11 +51,11 @@ func processWeather(params *Params) {
 		},
 	)
 	if err != nil {
-		fmt.Printf("Error getting OpenWeather OneCall: %v", err)
+		log.Printf("Error getting OpenWeather OneCall: %v", err)
 		return
 	}
 
-	//fmt.Printf("Weather: %v\n", w)
+	log.Printf("Weather: %f %d %d\n", w.Current.Temp, w.Current.Humidity, w.Current.Pressure)
 	params.AIOChan <- adafruitio.Metric{
 		Feed:  "weather.temp",
 		Value: fmt.Sprintf("%f", w.Current.Temp),

@@ -3,6 +3,7 @@ package finance
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -31,12 +32,12 @@ func Fetcher(params Params) {
 	cfg.AddDefaultHeader("X-Finnhub-Token", params.APIKey)
 	ticker := time.NewTicker(10 * time.Minute)
 
-	fmt.Println("Finnhub fetcher starting...")
+	log.Println("Finnhub fetcher starting...")
 	processQuotes(cfg, params.AIOChan, symbols)
 	for {
 		select {
 		case <-params.DoneChan:
-			fmt.Println("Finnhub fetcher shutting down...")
+			log.Println("Finnhub fetcher shutting down...")
 			ticker.Stop()
 			params.WG.Done()
 			return
@@ -51,9 +52,11 @@ func processQuotes(cfg *finnhub.Configuration, ch chan adafruitio.Metric, symbol
 	for _, symbol := range symbols {
 		quote, _, err := client.Quote(context.Background(), symbol)
 		if err != nil {
-			fmt.Printf("Error getting quote for %q: %v", symbol, err)
+			log.Printf("Error getting quote for %q: %v", symbol, err)
+		} else if quote.C == 0.0 {
+			log.Printf("Ignoring zero-valued quote for %q", symbol)
 		} else {
-			//fmt.Printf("Quote for %q: %v\n", symbol, quote.C)
+			log.Printf("Quote for %q: %v\n", symbol, quote.C)
 			ch <- adafruitio.Metric{
 				Feed:  "finance." + strings.ReplaceAll(strings.ToLower(symbol), ":", "-"),
 				Value: fmt.Sprintf("%f", quote.C),
