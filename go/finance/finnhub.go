@@ -29,7 +29,7 @@ func Fetcher(params Params) {
 
 	cfg := finnhub.NewConfiguration()
 	cfg.AddDefaultHeader("X-Finnhub-Token", params.APIKey)
-	timer := time.NewTimer(10 * time.Minute)
+	ticker := time.NewTicker(10 * time.Minute)
 
 	fmt.Println("Finnhub fetcher starting...")
 	processQuotes(cfg, params.AIOChan, symbols)
@@ -37,9 +37,10 @@ func Fetcher(params Params) {
 		select {
 		case <-params.DoneChan:
 			fmt.Println("Finnhub fetcher shutting down...")
+			ticker.Stop()
 			params.WG.Done()
 			return
-		case <-timer.C:
+		case <-ticker.C:
 			processQuotes(cfg, params.AIOChan, symbols)
 		}
 	}

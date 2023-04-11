@@ -19,7 +19,7 @@ type Params struct {
 }
 
 func Fetcher(params Params) {
-	timer := time.NewTimer(10 * time.Minute)
+	ticker := time.NewTicker(10 * time.Minute)
 
 	fmt.Println("OpenWeather fetcher starting...")
 	processWeather(&params)
@@ -27,9 +27,10 @@ func Fetcher(params Params) {
 		select {
 		case <-params.DoneChan:
 			fmt.Println("OpenWeather fetcher shutting down...")
+			ticker.Stop()
 			params.WG.Done()
 			return
-		case <-timer.C:
+		case <-ticker.C:
 			processWeather(&params)
 		}
 	}
