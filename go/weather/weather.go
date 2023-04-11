@@ -55,17 +55,21 @@ func processWeather(params *Params) {
 		return
 	}
 
-	log.Printf("Weather: %f %d %d\n", w.Current.Temp, w.Current.Humidity, w.Current.Pressure)
+	temperature := w.Current.Temp
+	humidity := w.Current.Humidity
+	// Convert hPa to inHg.
+	pressure := float32(w.Current.Pressure) / 33.863886666667
+	log.Printf("Weather: %.1f'F %d%% %.2finHg\n", temperature, humidity, pressure)
 	params.AIOChan <- adafruitio.Metric{
 		Feed:  "weather.temp",
-		Value: fmt.Sprintf("%f", w.Current.Temp),
+		Value: fmt.Sprintf("%f", temperature),
 	}
 	params.AIOChan <- adafruitio.Metric{
 		Feed:  "weather.humidity",
-		Value: fmt.Sprintf("%d", w.Current.Humidity),
+		Value: fmt.Sprintf("%d", humidity),
 	}
 	params.AIOChan <- adafruitio.Metric{
 		Feed:  "weather.pressure",
-		Value: fmt.Sprintf("%d", w.Current.Pressure),
+		Value: fmt.Sprintf("%f", pressure),
 	}
 }
