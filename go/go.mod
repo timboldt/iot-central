@@ -15,4 +15,7 @@ require (
 	golang.org/x/net v0.0.0-20190108225652-1e06a53dbb7e // indirect
 	golang.org/x/oauth2 v0.0.0-20190604053449-0f29369cfe45 // indirect
 	google.golang.org/appengine v1.4.0 // indirect
+	periph.io/x/conn/v3 v3.7.0 // indirect
+	periph.io/x/devices/v3 v3.7.0 // indirect
+	periph.io/x/host/v3 v3.8.0 // indirect
 )
