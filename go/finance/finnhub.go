@@ -21,11 +21,11 @@ type Params struct {
 
 func Fetcher(params Params) {
 	symbols := []string{
-		"DIA",
+		//"DIA",
 		"COINBASE:BTC-USD",
-		"BITFINEX:USTUSD",
+		//"BITFINEX:USTUSD",
 		"KRAKEN:USDTZUSD",
-		"QQQ",
+		//"QQQ",
 	}
 
 	cfg := finnhub.NewConfiguration()
