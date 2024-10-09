@@ -32,7 +32,7 @@ impl Finance {
         println!("Finance task shutting down.");
     }
 
-    pub async fn process(&self) {
+    async fn process(&self) {
         for symbol in &self.symbols {
             let client = Client::new(self.api_key.clone());
             let res = client.quote(symbol.to_string()).await.unwrap();

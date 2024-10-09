@@ -29,7 +29,6 @@ async fn main() -> io::Result<()> {
         }
         Err(err) => {
             eprintln!("Unable to listen for shutdown signal: {}", err);
-            // we also shut down in case of error
         }
     }
 
